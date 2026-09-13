@@ -9,8 +9,13 @@ import { Icon } from "@/components/ui/Icon";
  *
  * The storefront navigation is deliberately absent: once a shopper starts
  * checking out, the only routes that matter are back to the cart and home.
+ * After a payment the cart link goes too — there is nothing left in it.
  */
-export function CheckoutHeader() {
+export interface CheckoutHeaderProps {
+  showCartLink?: boolean;
+}
+
+export function CheckoutHeader({ showCartLink = true }: CheckoutHeaderProps) {
   return (
     <header className="border-b border-border-subtle bg-surface">
       <Container className="flex h-16 items-center justify-between gap-4 lg:h-18">
@@ -21,14 +26,16 @@ export function CheckoutHeader() {
             <Icon name="lock" className="size-4" />
             Secure checkout
           </span>
-          <Link
-            href="/cart"
-            className="link-underline -mx-2 inline-flex min-h-11 items-center gap-1.5 px-2 text-sm font-semibold text-foreground-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
-          >
-            <Icon name="bag" className="size-4" />
-            <span className="hidden xs:inline">Back to cart</span>
-            <span className="xs:hidden">Cart</span>
-          </Link>
+          {showCartLink ? (
+            <Link
+              href="/cart"
+              className="link-underline -mx-2 inline-flex min-h-11 items-center gap-1.5 px-2 text-sm font-semibold text-foreground-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+            >
+              <Icon name="bag" className="size-4" />
+              <span className="hidden xs:inline">Back to cart</span>
+              <span className="xs:hidden">Cart</span>
+            </Link>
+          ) : null}
         </div>
       </Container>
     </header>

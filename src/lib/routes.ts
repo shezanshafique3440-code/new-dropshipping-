@@ -10,9 +10,19 @@ export function productHref(slug: string): string {
   return `/shop/${slug}`;
 }
 
+/** The catalogue landing page. */
+export function shopHref(): string {
+  return "/shop";
+}
+
 /** The checkout flow. */
 export function checkoutHref(): string {
   return "/checkout";
+}
+
+/** Where Stripe returns a shopper after a completed payment. */
+export function checkoutSuccessHref(): string {
+  return "/checkout/success";
 }
 
 /** Catalogue filtered to one category. */

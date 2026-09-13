@@ -36,13 +36,13 @@ export const checkoutSteps: readonly CheckoutStep[] = [
     id: "payment",
     label: "Payment",
     title: "Payment method",
-    description: "Choose how you would like to pay when checkout opens.",
+    description: "How your payment is taken, and what we accept.",
   },
   {
     id: "review",
     label: "Review",
     title: "Review your order",
-    description: "Check everything over before you finish.",
+    description: "Check everything over before you pay.",
   },
 ];
 
@@ -239,7 +239,6 @@ export function initialCheckoutState(
     information: emptyInformation,
     address: emptyAddress,
     deliveryOptionId: defaultDeliveryOptionId,
-    paymentMethodId: "card",
     outcome: { kind: "editing" },
   };
 }

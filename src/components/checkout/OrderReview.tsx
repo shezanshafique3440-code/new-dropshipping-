@@ -3,13 +3,12 @@
 import { CheckoutItem } from "@/components/checkout/CheckoutItem";
 import { useCart } from "@/components/cart/CartProvider";
 import { Icon } from "@/components/ui/Icon";
-import { findDeliveryOption, paymentOptions, paymentStatus } from "@/data/checkout-options";
+import { findDeliveryOption, paymentHandoff } from "@/data/checkout-options";
 import { findCountry } from "@/data/countries";
 import { formatAddressLines } from "@/lib/checkout";
 import type {
   CheckoutStepId,
   CustomerInformation,
-  PaymentMethodId,
   ShippingAddress,
 } from "@/types";
 
@@ -17,7 +16,6 @@ export interface OrderReviewProps {
   information: CustomerInformation;
   address: ShippingAddress;
   deliveryOptionId: string;
-  paymentMethodId: PaymentMethodId;
   onEdit: (step: CheckoutStepId) => void;
 }
 
@@ -55,12 +53,10 @@ export function OrderReview({
   information,
   address,
   deliveryOptionId,
-  paymentMethodId,
   onEdit,
 }: OrderReviewProps) {
   const { items } = useCart();
   const delivery = findDeliveryOption(deliveryOptionId);
-  const payment = paymentOptions.find((option) => option.id === paymentMethodId);
   const countryName = findCountry(address.country)?.name ?? address.country;
   const addressLines = formatAddressLines(address, countryName);
 
@@ -86,10 +82,12 @@ export function OrderReview({
       </ReviewSection>
 
       <ReviewSection title="Payment method" step="payment" onEdit={onEdit}>
-        <p className="font-medium text-foreground">{payment?.name}</p>
+        <p className="font-medium text-foreground">
+          {paymentHandoff.reviewSummary}
+        </p>
         <p className="type-caption flex items-start gap-1.5">
           <Icon name="lock" className="mt-px size-3.5 shrink-0" />
-          {paymentStatus.message}
+          Card details are entered on {paymentHandoff.provider}, never on ZYVERO.
         </p>
       </ReviewSection>
 

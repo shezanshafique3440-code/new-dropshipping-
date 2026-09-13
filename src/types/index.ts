@@ -249,9 +249,11 @@ export interface CartState {
 /* -------------------------------------------------------------------------
  * Checkout
  *
- * Frontend-only for now: no payment is processed and no order is created, so
- * nothing here models a transaction. Customer details live in component state
- * for the length of the session and are never persisted — see `CheckoutShell`.
+ * Payment is taken by Stripe Checkout on Stripe's own hosted page, so no card
+ * data ever reaches this application. Customer details live in component state
+ * for the length of the session and are never persisted client-side — see
+ * `CheckoutShell`. What was actually paid for is modelled by `Order` below,
+ * which only ever comes into existence server-side after Stripe confirms.
  * ---------------------------------------------------------------------- */
 
 export const CHECKOUT_STEP_IDS = [
@@ -302,31 +304,31 @@ export interface DeliveryOption {
   note: string;
 }
 
-export const PAYMENT_METHOD_IDS = ["card", "wallet", "bank"] as const;
+/**
+ * Whether payments are live, in Stripe's test mode, or unavailable.
+ * Resolved on the server and passed down; no key ever crosses the boundary.
+ */
+export type PaymentMode = "test" | "live" | "unconfigured";
 
-export type PaymentMethodId = (typeof PAYMENT_METHOD_IDS)[number];
-
-export interface PaymentOption {
-  id: PaymentMethodId;
+/** One accepted payment method, listed on the payment step. */
+export interface PaymentMethodSummary {
+  id: string;
   name: string;
   description: string;
   icon: IconName;
 }
 
 /**
- * Payment is deliberately inert. The union has one member today; a connected
- * gateway would add its own states rather than reinterpreting this one.
+ * Where the checkout has got to.
+ *
+ * `redirecting` covers the window between asking the server for a Stripe
+ * Checkout Session and the browser leaving for Stripe; `error` carries a
+ * message that is safe to show (never a Stripe or server internal).
  */
-export type PaymentStatus = {
-  kind: "not-connected";
-  /** Shown to the shopper, so the state is never mistaken for a live gateway. */
-  message: string;
-};
-
-/** Where the checkout has got to. */
 export type CheckoutOutcome =
   | { kind: "editing" }
-  | { kind: "preview-notice" };
+  | { kind: "redirecting" }
+  | { kind: "error"; message: string };
 
 export interface CheckoutState {
   step: CheckoutStepId;
@@ -335,8 +337,80 @@ export interface CheckoutState {
   information: CustomerInformation;
   address: ShippingAddress;
   deliveryOptionId: string;
-  paymentMethodId: PaymentMethodId;
   outcome: CheckoutOutcome;
+}
+
+/* -------------------------------------------------------------------------
+ * Orders
+ *
+ * An order exists only once Stripe has confirmed the money moved. Every
+ * amount is an integer number of minor currency units (cents for USD) so no
+ * float ever touches a total. Nothing here holds card data: Stripe collects
+ * and stores the payment credentials, and this app keeps only the identifiers
+ * needed to reconcile with it.
+ * ---------------------------------------------------------------------- */
+
+export const ORDER_STATUSES = ["pending", "paid", "cancelled", "failed"] as const;
+
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
+
+export const ORDER_PAYMENT_STATUSES = [
+  "unpaid",
+  "paid",
+  "failed",
+  "refunded",
+] as const;
+
+export type OrderPaymentStatus = (typeof ORDER_PAYMENT_STATUSES)[number];
+
+export interface OrderItem {
+  productId: string;
+  slug: string;
+  name: string;
+  quantity: number;
+  /** Unit price in minor units, as charged. */
+  unitAmount: number;
+  /** `unitAmount * quantity`, never recomputed from a float price. */
+  lineAmount: number;
+}
+
+export interface OrderCustomer {
+  email: string;
+  name: string;
+}
+
+/** Delivery address as confirmed at payment time. */
+export interface OrderShippingAddress {
+  name: string;
+  line1: string;
+  line2: string;
+  city: string;
+  region: string;
+  postalCode: string;
+  /** ISO 3166-1 alpha-2. */
+  country: string;
+}
+
+export interface Order {
+  /** Internal id. Never shown to the customer. */
+  id: string;
+  /** Customer-facing reference, e.g. `ZYV-7Q4K2M`. */
+  reference: string;
+  status: OrderStatus;
+  paymentStatus: OrderPaymentStatus;
+  /** ISO 4217, lowercase to match Stripe. */
+  currency: string;
+  subtotalAmount: number;
+  shippingAmount: number;
+  totalAmount: number;
+  customer: OrderCustomer;
+  shippingAddress: OrderShippingAddress | null;
+  items: readonly OrderItem[];
+  deliveryOptionId: string;
+  stripeCheckoutSessionId: string;
+  stripePaymentIntentId: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** Field-keyed validation messages. Empty means the step is valid. */

@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { CheckoutHeader } from "@/components/checkout/CheckoutHeader";
 import { CheckoutShell } from "@/components/checkout/CheckoutShell";
 import { siteConfig } from "@/config/site";
+import { getStripeMode, isPaymentConfigured } from "@/server/payments/config";
+import type { PaymentMode } from "@/types";
 
 export const metadata: Metadata = {
   title: { absolute: `Checkout — ${siteConfig.name}` },
@@ -14,14 +16,29 @@ export const metadata: Metadata = {
 /**
  * Checkout route.
  *
- * The storefront header and footer are hidden here by `SiteChrome`; this page
- * renders its own focused chrome. Only the flow itself needs client state.
+ * Rendered per request so the payment mode reflects the running server rather
+ * than whatever was configured at build time. Only the mode crosses to the
+ * client — never a key.
  */
-export default function CheckoutPage() {
+export const dynamic = "force-dynamic";
+
+interface CheckoutPageProps {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+export default async function CheckoutPage({ searchParams }: CheckoutPageProps) {
+  const params = await searchParams;
+  const paymentMode: PaymentMode = isPaymentConfigured()
+    ? getStripeMode()
+    : "unconfigured";
+
   return (
     <>
       <CheckoutHeader />
-      <CheckoutShell />
+      <CheckoutShell
+        paymentMode={paymentMode}
+        cancelled={params.payment === "cancelled"}
+      />
     </>
   );
 }

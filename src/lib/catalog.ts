@@ -17,6 +17,17 @@ export function findProductBySlug(slug: string): Product | undefined {
   return products.find((product) => product.slug === slug);
 }
 
+/**
+ * Authoritative product lookup by id.
+ *
+ * The payment layer resolves every basket line through this, so a price only
+ * ever comes from the catalogue — never from the browser. When the catalogue
+ * moves to a database or supplier feed, this stays the single seam.
+ */
+export function findProductById(id: string): Product | undefined {
+  return products.find((product) => product.id === id);
+}
+
 export const defaultFilters: CatalogFilters = {
   query: "",
   category: "all",

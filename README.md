@@ -5,11 +5,13 @@
 A premium international storefront built with Next.js (App Router), TypeScript
 and Tailwind CSS.
 
-> **Status: Step 2 — visual identity and design system.**
-> Routing, design tokens, the ZYVERO brand system and the shared UI primitives
-> are in place. Catalogue, cart logic, checkout, payments, auth, admin and
-> supplier integrations are deliberately **not** implemented yet — each lands in
-> its own step.
+> **Status: Step 7 — Stripe payments (test mode).**
+> Foundation, design system, homepage, catalogue, cart, checkout and payment
+> are in place. Payment runs through Stripe Checkout and is expected to be in
+> **test mode**: a live key is refused unless the deployment explicitly opts in
+> (see [Payments](#payments-stripe)). Fulfilment, tax, transactional email,
+> accounts, admin and supplier integrations are deliberately **not** implemented
+> yet — each lands in its own step.
 
 ## Getting started
 
@@ -42,7 +44,13 @@ src/
 │   ├── error.tsx               # Route error boundary
 │   ├── global-error.tsx        # Root layout error boundary
 │   ├── not-found.tsx           # Custom 404
-│   └── shop|cart|account|contact/page.tsx
+│   ├── shop|cart|account|contact/page.tsx
+│   ├── checkout/page.tsx       # Checkout flow
+│   ├── checkout/success/       # Stripe return: verifies before confirming
+│   └── api/
+│       ├── checkout/create-session/route.ts
+│       ├── checkout/session-status/route.ts
+│       └── webhooks/stripe/route.ts
 ├── components/
 │   ├── brand/                  # Brand identity
 │   │   ├── Wordmark.tsx        # Text-based ZYVERO wordmark + monogram
@@ -66,7 +74,11 @@ src/
 │       └── SocialIcon.tsx
 ├── config/site.ts              # Brand, currency, nav, announcement, socials
 ├── hooks/useLockBodyScroll.ts
-├── lib/                        # env.ts, format.ts, utils.ts
+├── lib/                        # env, format, money, cart, checkout, catalog, routes
+├── server/                     # server-only: never imported by a client component
+│   ├── orders/                 # order domain + repository (in-memory adapter)
+│   ├── payments/               # Stripe client, config, validation, session, orders
+│   └── rate-limit.ts
 ├── styles/globals.css          # Tokens, theme mapping, utilities
 └── types/index.ts
 public/images  public/icons
@@ -122,6 +134,82 @@ a masked 1px gradient outline.
 setting `data-theme="light" | "dark"` on `<html>`. The `dark:` variant is wired
 to both conditions. Dark mode is designed, not inverted: deep navy surfaces with
 brighter brand hues.
+
+## Payments (Stripe)
+
+Payment is taken by **Stripe Checkout**, Stripe's own hosted payment page.
+Card number, expiry and CVC are entered on Stripe's domain and never reach this
+application, which is the whole reason for choosing Checkout over Elements.
+
+### Flow
+
+```
+Cart → /checkout → POST /api/checkout/create-session
+     → Stripe Checkout (hosted)  → payment
+     → /checkout/success?session_id=…  → GET /api/checkout/session-status  (verifies)
+     → POST /api/webhooks/stripe        (authoritative confirmation)
+     → order created exactly once → cart cleared
+```
+
+The browser's return trip is **never** treated as proof of payment. Both the
+success page and the webhook ask Stripe what happened and go through the same
+`recordOrderForSession`, which upserts on the Checkout Session id — so one
+payment produces exactly one order however many times either arrives.
+
+Prices are never taken from the browser. The session endpoint accepts product
+ids and quantities only, then resolves every price from the catalogue
+(`findProductById`) and computes totals in integer minor units (`src/lib/money.ts`).
+
+### Environment variables
+
+Copy `.env.example` to `.env.local` and fill in **test** keys from
+<https://dashboard.stripe.com/test/apikeys>:
+
+| Variable                 | Where it is read | Notes                                              |
+| ------------------------ | ---------------- | -------------------------------------------------- |
+| `STRIPE_SECRET_KEY`      | server only      | `sk_test_…` while testing. Never exposed to the client. |
+| `STRIPE_WEBHOOK_SECRET`  | server only      | `whsec_…`, from the webhook endpoint or the CLI.   |
+| `STRIPE_ALLOW_LIVE_MODE` | server only      | Must be `true` before a `sk_live_…` key is accepted. |
+| `NEXT_PUBLIC_SITE_URL`   | server + client  | Origin used to build Stripe's return URLs.         |
+
+No publishable key is needed: the browser is redirected to the URL Stripe
+returns, so no Stripe JavaScript runs on our pages.
+
+### Local webhook testing
+
+```bash
+stripe login
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
+# copy the printed whsec_… into STRIPE_WEBHOOK_SECRET, then restart the dev server
+```
+
+`stripe trigger checkout.session.completed` replays an event; deliveries with a
+bad or missing signature are rejected with 400.
+
+### Testing a payment
+
+Use Stripe's published [test cards](https://docs.stripe.com/testing) — for
+example the standard success card, the `4000 0000 0000 9995` decline, and the
+`4000 0025 0000 3155` 3-D Secure card. No test card number is hardcoded in this
+repository or shown in the UI, and real cards must never be used against test
+keys.
+
+### Going live
+
+1. Provide live keys (`sk_live_…`, and a live-mode `whsec_…` for the deployed
+   webhook endpoint).
+2. Set `STRIPE_ALLOW_LIVE_MODE=true` — without it the server refuses to start a
+   payment, so a live key can never be picked up by accident.
+3. Point `NEXT_PUBLIC_SITE_URL` at the production origin.
+4. Replace the in-memory order repository with a database-backed
+   `OrderRepository` (see `src/server/orders/repository.ts`); orders currently
+   live in process memory and do not survive a restart.
+
+### Deliberately not implemented
+
+Shipping is charged at **zero** and stated as such — there is no fulfilment
+integration to price it. `automatic_tax` is **off** and no tax rate is invented.
+There is no transactional email, so the confirmation lives on the success page.
 
 ## Configuration
 

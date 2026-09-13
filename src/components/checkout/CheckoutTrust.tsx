@@ -8,7 +8,7 @@ import type { IconName } from "@/types";
  * compliance badges, no certificate claims, no invented guarantees.
  */
 const notes: ReadonlyArray<{ icon: IconName; label: string }> = [
-  { icon: "lock", label: "No card details are collected in this preview" },
+  { icon: "lock", label: "Card details are entered on Stripe, never on ZYVERO" },
   { icon: "shield", label: "Your details stay in this browser session" },
   { icon: "chat", label: "Questions? Support is one message away" },
 ];

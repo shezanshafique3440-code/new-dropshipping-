@@ -1,11 +1,11 @@
-import type { DeliveryOption, PaymentOption, PaymentStatus } from "@/types";
+import type { DeliveryOption, PaymentMethodSummary } from "@/types";
 
 /**
  * Delivery and payment options.
  *
- * Centralised so a fulfilment or payment integration replaces this one file.
- * No rates are quoted and no gateway is wired up: both are stated as pending
- * rather than guessed at.
+ * Delivery rates are still pending a fulfilment integration and are stated as
+ * such rather than guessed at. Payment is live through Stripe Checkout, and
+ * the wording describing that handover lives here too.
  */
 
 export const deliveryOptions: readonly DeliveryOption[] = [
@@ -35,33 +35,42 @@ export function findDeliveryOption(id: string): DeliveryOption | undefined {
   return deliveryOptions.find((option) => option.id === id);
 }
 
-export const paymentOptions: readonly PaymentOption[] = [
+/**
+ * What the shopper can pay with.
+ *
+ * Stripe Checkout decides the exact set it can offer for a given card,
+ * country and device, so this list describes the methods the account is set
+ * up for rather than pretending to be an authoritative switch.
+ */
+export const acceptedPaymentMethods: readonly PaymentMethodSummary[] = [
   {
     id: "card",
-    name: "Card payment",
+    name: "Card",
     description: "Visa, Mastercard and American Express.",
     icon: "lock",
   },
   {
     id: "wallet",
-    name: "Digital wallet",
-    description: "Apple Pay, Google Pay and similar wallets.",
+    name: "Digital wallets",
+    description: "Apple Pay and Google Pay, where your device supports them.",
     icon: "bag",
-  },
-  {
-    id: "bank",
-    name: "Bank transfer",
-    description: "Pay directly from your bank account.",
-    icon: "layers",
   },
 ];
 
 /**
- * The single statement of why payment cannot run yet. Every payment surface
- * reads this, so the message can never drift into implying a live gateway.
+ * How payment actually happens, in one place.
+ *
+ * Every payment surface reads these strings, so the description of the flow
+ * cannot drift between the payment step, the review step and the button.
  */
-export const paymentStatus: PaymentStatus = {
-  kind: "not-connected",
-  message:
-    "Payment is not connected yet. No card details are collected here and nothing can be charged.",
-};
+export const paymentHandoff = {
+  provider: "Stripe",
+  title: "You will pay on Stripe's secure page",
+  description:
+    "Selecting continue takes you to Stripe Checkout to complete payment. Card details are entered on Stripe and never reach ZYVERO.",
+  reviewSummary: "Card or digital wallet, paid on Stripe's secure page.",
+  testModeNotice:
+    "Stripe is running in test mode, so no real money moves. Use a Stripe test card to complete a payment.",
+  unconfiguredNotice:
+    "Payments are not available right now. Nothing you enter here is lost — please try again shortly.",
+} as const;
