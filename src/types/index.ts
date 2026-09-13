@@ -91,16 +91,61 @@ export interface SiteConfig {
 
 /** Key selecting one of the built-in SVG product illustrations. */
 export type ProductArtKey =
+  // Tech
   | "headphones"
-  | "lamp"
-  | "backpack"
   | "speaker"
-  | "watch"
-  | "bottle"
-  | "sunglasses"
+  | "keyboard"
+  | "chargingDock"
+  | "projector"
+  | "earbuds"
+  | "powerBank"
+  // Home
+  | "lamp"
+  | "diffuser"
+  | "deskLight"
+  | "deskOrganizer"
+  | "humidifier"
   | "mug"
+  // Lifestyle
+  | "backpack"
+  | "slingBag"
+  | "travelOrganizer"
+  | "crossbody"
+  | "sportBottle"
+  // Beauty
+  | "facialSteamer"
+  | "mirror"
+  | "iceRoller"
+  | "facialTool"
   | "skincare"
-  | "keyboard";
+  // Accessories
+  | "watch"
+  | "sunglasses"
+  | "wallet"
+  | "phoneStand"
+  | "keyOrganizer"
+  | "cardHolder"
+  // Everyday essentials
+  | "bottle"
+  | "storageBox"
+  | "multiTool";
+
+/** The catalogue's top-level categories. */
+export const PRODUCT_CATEGORIES = [
+  "Tech",
+  "Home",
+  "Lifestyle",
+  "Beauty",
+  "Accessories",
+  "Everyday Essentials",
+] as const;
+
+export type ProductCategory = (typeof PRODUCT_CATEGORIES)[number];
+
+/** Merchandising flags a shopper can filter by. */
+export const PRODUCT_TAGS = ["bestSeller", "newArrival", "trending"] as const;
+
+export type ProductTag = (typeof PRODUCT_TAGS)[number];
 
 /** Colour family applied to generated artwork panels. */
 export type ArtTone = "violet" | "blue" | "cyan" | "magenta" | "neutral";
@@ -128,18 +173,52 @@ export interface ProductRating {
 
 export interface Product {
   id: string;
+  /** URL segment: `/shop/<slug>`. Unique across the catalogue. */
+  slug: string;
   name: string;
-  /** Human-readable category label, e.g. "Tech". */
-  category: string;
-  /** Where the card links. Every product points at /shop until Step 4. */
-  href: string;
+  category: ProductCategory;
+  /** One or two sentences, used on the detail page and by search. */
+  description: string;
+  /** Short selling points listed on the detail page. */
+  features: readonly string[];
   price: number;
   /** Original price, shown struck through when present. */
   compareAtPrice?: number;
   badge?: ProductBadge;
   rating?: ProductRating;
+  /** Merchandising flags, also used by the "Featured" sort. */
+  tags: readonly ProductTag[];
+  /** Hand-picked for the homepage and the default catalogue order. */
+  featured?: boolean;
+  /**
+   * Catalogue position, newest first. A stand-in for `createdAt` until real
+   * timestamps exist — lower numbers are more recently added.
+   */
+  addedRank: number;
   art: ProductArtKey;
   tone: ArtTone;
+}
+
+/** Sort orders offered by the catalogue toolbar. */
+export const SORT_OPTIONS = [
+  { value: "featured", label: "Featured" },
+  { value: "newest", label: "Newest" },
+  { value: "price-low", label: "Price: Low to High" },
+  { value: "price-high", label: "Price: High to Low" },
+  { value: "rating", label: "Rating" },
+  { value: "popular", label: "Most Popular" },
+] as const;
+
+export type SortValue = (typeof SORT_OPTIONS)[number]["value"];
+
+/** The complete catalogue query, mirrored in the URL. */
+export interface CatalogFilters {
+  query: string;
+  category: ProductCategory | "all";
+  tags: readonly ProductTag[];
+  minPrice: number;
+  maxPrice: number;
+  sort: SortValue;
 }
 
 /** Key selecting one of the abstract category artworks. */
@@ -219,4 +298,6 @@ export type IconName =
   | "globe"
   | "chat"
   | "layers"
-  | "refresh";
+  | "refresh"
+  | "plus"
+  | "minus";

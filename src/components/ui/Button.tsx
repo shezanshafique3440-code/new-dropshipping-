@@ -1,7 +1,7 @@
 import Link, { type LinkProps } from "next/link";
 import type {
   AnchorHTMLAttributes,
-  ButtonHTMLAttributes,
+  ComponentPropsWithRef,
   ReactNode,
 } from "react";
 
@@ -78,7 +78,7 @@ export function buttonStyles({
 }
 
 export interface ButtonProps
-  extends ButtonHTMLAttributes<HTMLButtonElement>,
+  extends ComponentPropsWithRef<"button">,
     ButtonStyleProps {
   children: ReactNode;
 }

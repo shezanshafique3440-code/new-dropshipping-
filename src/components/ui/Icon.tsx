@@ -87,6 +87,8 @@ const glyphs: Record<IconName, ReactElement> = {
       <path d="m5.25 12.5 6.75 3.6 6.75-3.6M5.25 16.25 12 19.85l6.75-3.6" />
     </>
   ),
+  plus: <path d="M12 5v14M5 12h14" />,
+  minus: <path d="M5 12h14" />,
   refresh: (
     <>
       <path d="M19 12a7 7 0 1 1-2.4-5.3" />

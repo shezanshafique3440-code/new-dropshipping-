@@ -5,6 +5,7 @@ import { ProductArtwork } from "@/components/product/ProductArtwork";
 import { Rating } from "@/components/product/Rating";
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
+import { productHref } from "@/lib/catalog";
 import { formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Product, ProductBadgeTone } from "@/types";
@@ -36,8 +37,17 @@ export function ProductCard({
   showRating = false,
   className,
 }: ProductCardProps) {
-  const { name, category, href, price, compareAtPrice, badge, rating, art, tone } =
-    product;
+  const {
+    name,
+    category,
+    slug,
+    price,
+    compareAtPrice,
+    badge,
+    rating,
+    art,
+    tone,
+  } = product;
   const discount =
     compareAtPrice === undefined
       ? undefined
@@ -48,7 +58,10 @@ export function ProductCard({
       as="article"
       variant="default"
       interactive
-      className={cn("group relative flex h-full flex-col overflow-hidden", className)}
+      className={cn(
+        "group relative flex h-full flex-col overflow-hidden",
+        className,
+      )}
     >
       <div className="relative">
         <ProductArtwork art={art} tone={tone} />
@@ -78,7 +91,7 @@ export function ProductCard({
         <h3 className="text-sm leading-snug font-semibold sm:text-base">
           {/* Stretched link: the whole card is clickable, the heart is not. */}
           <Link
-            href={href}
+            href={productHref(slug)}
             className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
           >
             {name}

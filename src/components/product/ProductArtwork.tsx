@@ -192,6 +192,334 @@ const glyphs: Record<ProductArtKey, ReactElement> = {
       <path d="M28 70h14" strokeOpacity="0.5" />
     </>
   ),
+  chargingDock: (
+    <>
+      <path
+        d="M26 96h68a8 8 0 0 0 8-8V84H18v4a8 8 0 0 0 8 8Z"
+        fill="currentColor"
+        fillOpacity="0.16"
+      />
+      <rect x="26" y="30" width="30" height="54" rx="8" />
+      <rect
+        x="66"
+        y="46"
+        width="26"
+        height="38"
+        rx="10"
+        fill="currentColor"
+        fillOpacity="0.13"
+      />
+      <path d="M41 40v10M79 56v8" strokeOpacity="0.55" />
+    </>
+  ),
+  projector: (
+    <>
+      <rect
+        x="18"
+        y="46"
+        width="64"
+        height="34"
+        rx="12"
+        fill="currentColor"
+        fillOpacity="0.14"
+      />
+      <circle cx="38" cy="63" r="11" />
+      <path d="M66 57h6M66 69h6" strokeOpacity="0.55" />
+      <path d="M86 48 108 38v50L86 78" fill="currentColor" fillOpacity="0.08" />
+    </>
+  ),
+  earbuds: (
+    <>
+      {/* Two buds with stems, so the pair does not read as eyewear. */}
+      <path
+        d="M34 32a14 14 0 0 1 14 14v6a10 10 0 0 1-20 0v-6a14 14 0 0 1 6-14Z"
+        fill="currentColor"
+        fillOpacity="0.16"
+      />
+      <path d="M38 62v22a8 8 0 0 0 8 8" />
+      <path
+        d="M86 32a14 14 0 0 0-14 14v6a10 10 0 0 0 20 0v-6a14 14 0 0 0-6-14Z"
+        fill="currentColor"
+        fillOpacity="0.16"
+      />
+      <path d="M82 62v22a8 8 0 0 1-8 8" />
+      <path d="M52 96h16" strokeOpacity="0.4" />
+    </>
+  ),
+  powerBank: (
+    <>
+      <rect
+        x="34"
+        y="20"
+        width="52"
+        height="80"
+        rx="14"
+        fill="currentColor"
+        fillOpacity="0.13"
+      />
+      <path d="m62 40-10 22h16l-10 20" />
+      <path d="M46 90h28" strokeOpacity="0.5" />
+      <path d="M50 30h20" strokeOpacity="0.4" />
+    </>
+  ),
+  diffuser: (
+    <>
+      <path
+        d="M34 76a26 26 0 0 1 18-24.7V46h16v5.3A26 26 0 0 1 86 76v6a20 20 0 0 1-20 20H54a20 20 0 0 1-20-20v-6Z"
+        fill="currentColor"
+        fillOpacity="0.14"
+      />
+      <path d="M52 46h16" />
+      <path
+        d="M50 30c5 4 5 9 0 13M70 26c5 4 5 9 0 13M60 18c4 3 4 7 0 10"
+        strokeOpacity="0.5"
+      />
+      <path d="M46 88h28" strokeOpacity="0.45" />
+    </>
+  ),
+  deskLight: (
+    <>
+      <path d="M28 100h34" />
+      <path d="M45 100V60l30-22" />
+      <path
+        d="m66 26 22 14-10 16-22-14 10-16Z"
+        fill="currentColor"
+        fillOpacity="0.16"
+      />
+      <path d="M62 56 84 70" strokeOpacity="0.4" />
+    </>
+  ),
+  deskOrganizer: (
+    <>
+      <path
+        d="M22 52h76v40a10 10 0 0 1-10 10H32a10 10 0 0 1-10-10V52Z"
+        fill="currentColor"
+        fillOpacity="0.13"
+      />
+      <path d="M46 52V32M62 52V26M78 52V36" strokeOpacity="0.6" />
+      <path d="M22 72h76" strokeOpacity="0.45" />
+    </>
+  ),
+  humidifier: (
+    <>
+      <path
+        d="M38 54h44v34a14 14 0 0 1-14 14H52a14 14 0 0 1-14-14V54Z"
+        fill="currentColor"
+        fillOpacity="0.14"
+      />
+      <path d="M50 54V44a10 10 0 0 1 20 0v10" />
+      <path d="M46 24c4 4 4 8 0 12M74 22c4 4 4 8 0 12" strokeOpacity="0.5" />
+      <circle
+        cx="60"
+        cy="80"
+        r="6"
+        fill="currentColor"
+        fillOpacity="0.3"
+        strokeOpacity="0"
+      />
+    </>
+  ),
+  slingBag: (
+    <>
+      <path
+        d="M28 62 68 30a14 14 0 0 1 22 11v37a16 16 0 0 1-16 16H44a16 16 0 0 1-16-16V62Z"
+        fill="currentColor"
+        fillOpacity="0.14"
+      />
+      <path d="M28 62 88 88" strokeOpacity="0.55" />
+      <rect x="46" y="66" width="22" height="14" rx="5" />
+    </>
+  ),
+  travelOrganizer: (
+    <>
+      <rect
+        x="18"
+        y="38"
+        width="84"
+        height="46"
+        rx="12"
+        fill="currentColor"
+        fillOpacity="0.13"
+      />
+      <path d="M18 58h84" strokeOpacity="0.6" />
+      <path d="M52 38V28h16v10" />
+      <rect x="34" y="64" width="16" height="10" rx="4" strokeOpacity="0.6" />
+      <rect x="70" y="64" width="16" height="10" rx="4" strokeOpacity="0.6" />
+    </>
+  ),
+  crossbody: (
+    <>
+      <path
+        d="M32 54h56v34a14 14 0 0 1-14 14H46a14 14 0 0 1-14-14V54Z"
+        fill="currentColor"
+        fillOpacity="0.14"
+      />
+      <path d="M32 54v-6a10 10 0 0 1 10-10h36a10 10 0 0 1 10 10v6" />
+      <path d="M40 38C40 18 62 10 78 20" strokeOpacity="0.5" />
+      <rect x="52" y="66" width="16" height="12" rx="4" />
+    </>
+  ),
+  sportBottle: (
+    <>
+      <path d="M46 22h28v10H46z" fill="currentColor" fillOpacity="0.3" />
+      <path
+        d="M42 46a16 16 0 0 1 10-14h16a16 16 0 0 1 10 14v44a14 14 0 0 1-14 14H56a14 14 0 0 1-14-14V46Z"
+        fill="currentColor"
+        fillOpacity="0.13"
+      />
+      <path d="M42 62h36M42 78h36" strokeOpacity="0.45" />
+      <path d="M84 50h8v18h-8" strokeOpacity="0.5" />
+    </>
+  ),
+  facialSteamer: (
+    <>
+      <path
+        d="M40 66h40v22a14 14 0 0 1-14 14H54a14 14 0 0 1-14-14V66Z"
+        fill="currentColor"
+        fillOpacity="0.14"
+      />
+      <path d="m52 66 8-24h6l6 16" />
+      <circle cx="76" cy="34" r="9" fill="currentColor" fillOpacity="0.2" />
+      <path d="M34 30c4 4 4 8 0 12" strokeOpacity="0.45" />
+    </>
+  ),
+  mirror: (
+    <>
+      <circle cx="60" cy="52" r="30" fill="currentColor" fillOpacity="0.14" />
+      <circle cx="60" cy="52" r="20" strokeOpacity="0.55" />
+      <path d="M60 82v14M44 100h32" />
+      <path d="M32 32h.01M88 32h.01" strokeOpacity="0.4" />
+    </>
+  ),
+  iceRoller: (
+    <>
+      <rect
+        x="20"
+        y="42"
+        width="42"
+        height="26"
+        rx="13"
+        fill="currentColor"
+        fillOpacity="0.16"
+        transform="rotate(-18 41 55)"
+      />
+      <path d="m64 66 30 26" />
+      <path d="M88 86h14v10H92" strokeOpacity="0.5" />
+      <path d="M34 40v-8M50 44v-8" strokeOpacity="0.4" />
+    </>
+  ),
+  facialTool: (
+    <>
+      <path
+        d="M30 34c14-6 26 0 30 12s-2 24-16 28"
+        fill="currentColor"
+        fillOpacity="0.14"
+      />
+      <path d="m58 62 28 30" />
+      <circle cx="90" cy="96" r="6" strokeOpacity="0.6" />
+      <path d="M36 46h14" strokeOpacity="0.45" />
+    </>
+  ),
+  wallet: (
+    <>
+      <rect
+        x="20"
+        y="36"
+        width="80"
+        height="50"
+        rx="12"
+        fill="currentColor"
+        fillOpacity="0.13"
+      />
+      <path d="M20 54h56a10 10 0 0 1 0 20H20" strokeOpacity="0.6" />
+      <circle
+        cx="76"
+        cy="64"
+        r="4"
+        fill="currentColor"
+        fillOpacity="0.5"
+        strokeOpacity="0"
+      />
+      <path d="M32 36V26h40v10" strokeOpacity="0.4" />
+    </>
+  ),
+  phoneStand: (
+    <>
+      <rect
+        x="42"
+        y="20"
+        width="40"
+        height="58"
+        rx="8"
+        transform="rotate(10 62 49)"
+        fill="currentColor"
+        fillOpacity="0.14"
+      />
+      <path d="M26 96h68" />
+      <path d="M40 96 56 66M92 88 74 58" strokeOpacity="0.55" />
+      <path d="M56 32h16" strokeOpacity="0.4" />
+    </>
+  ),
+  keyOrganizer: (
+    <>
+      <rect
+        x="44"
+        y="20"
+        width="32"
+        height="60"
+        rx="10"
+        fill="currentColor"
+        fillOpacity="0.14"
+      />
+      <path d="M52 80v16M60 80v22M68 80v14" strokeOpacity="0.6" />
+      <circle cx="60" cy="34" r="6" />
+      <path d="M52 96h-6M68 94h6" strokeOpacity="0.4" />
+    </>
+  ),
+  cardHolder: (
+    <>
+      <rect
+        x="22"
+        y="46"
+        width="72"
+        height="44"
+        rx="10"
+        fill="currentColor"
+        fillOpacity="0.13"
+      />
+      <rect x="30" y="34" width="66" height="42" rx="10" strokeOpacity="0.7" />
+      <path d="M40 60h22" strokeOpacity="0.55" />
+      <path d="M40 70h12" strokeOpacity="0.4" />
+    </>
+  ),
+  storageBox: (
+    <>
+      <path
+        d="M22 44h76v46a10 10 0 0 1-10 10H32a10 10 0 0 1-10-10V44Z"
+        fill="currentColor"
+        fillOpacity="0.13"
+      />
+      <path d="M16 30h88v14H16z" fill="currentColor" fillOpacity="0.2" />
+      <path d="M48 62h24" strokeOpacity="0.6" />
+      <path d="M22 78h76" strokeOpacity="0.35" />
+    </>
+  ),
+  multiTool: (
+    <>
+      <rect
+        x="46"
+        y="40"
+        width="28"
+        height="62"
+        rx="13"
+        fill="currentColor"
+        fillOpacity="0.15"
+      />
+      <path d="M54 28h12" />
+      <path d="m74 52 26-14M74 68h26M74 84l24 12" strokeOpacity="0.7" />
+      <path d="M46 56 22 44M46 72H20" strokeOpacity="0.45" />
+    </>
+  ),
   keyboard: (
     <>
       <rect
