@@ -79,3 +79,144 @@ export interface SiteConfig {
   };
   social: readonly SocialLink[];
 }
+
+/* -------------------------------------------------------------------------
+ * Storefront content
+ *
+ * These describe the shapes the homepage renders. They are deliberately
+ * transport-agnostic: today `src/data/mock-storefront.ts` supplies them, and a
+ * database, CMS or supplier API can supply the same shapes later without any
+ * component changing.
+ * ---------------------------------------------------------------------- */
+
+/** Key selecting one of the built-in SVG product illustrations. */
+export type ProductArtKey =
+  | "headphones"
+  | "lamp"
+  | "backpack"
+  | "speaker"
+  | "watch"
+  | "bottle"
+  | "sunglasses"
+  | "mug"
+  | "skincare"
+  | "keyboard";
+
+/** Colour family applied to generated artwork panels. */
+export type ArtTone = "violet" | "blue" | "cyan" | "magenta" | "neutral";
+
+/** Merchandising label shown on a product card. */
+export type ProductBadgeTone =
+  | "new"
+  | "trending"
+  | "bestseller"
+  | "popular"
+  | "sale";
+
+export interface ProductBadge {
+  label: string;
+  tone: ProductBadgeTone;
+}
+
+/** Demo rating figures. Not verified customer data. */
+export interface ProductRating {
+  /** Average score out of 5. */
+  value: number;
+  /** Number of ratings behind the average. */
+  count: number;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  /** Human-readable category label, e.g. "Tech". */
+  category: string;
+  /** Where the card links. Every product points at /shop until Step 4. */
+  href: string;
+  price: number;
+  /** Original price, shown struck through when present. */
+  compareAtPrice?: number;
+  badge?: ProductBadge;
+  rating?: ProductRating;
+  art: ProductArtKey;
+  tone: ArtTone;
+}
+
+/** Key selecting one of the abstract category artworks. */
+export type CategoryArtKey =
+  | "orbit"
+  | "waves"
+  | "grid"
+  | "bloom"
+  | "prism"
+  | "stack";
+
+export interface Category {
+  id: string;
+  name: string;
+  tagline: string;
+  href: string;
+  art: CategoryArtKey;
+  tone: ArtTone;
+  /** Demo count shown as a hint of catalogue depth. */
+  itemCount: number;
+}
+
+/** A tile in the community mosaic. Illustrative, not a real social post. */
+export interface CommunityTile {
+  id: string;
+  handle: string;
+  tag: string;
+  caption: string;
+  art: ProductArtKey;
+  tone: ArtTone;
+}
+
+/** Demo testimonial. Replaced by real reviews in a later step. */
+export interface Testimonial {
+  id: string;
+  quote: string;
+  author: string;
+  location: string;
+  rating: number;
+  /** Initials shown in the avatar placeholder. */
+  initials: string;
+}
+
+/** A numbered value proposition in the "Shopping, Reimagined" section. */
+export interface ValueProp {
+  id: string;
+  index: string;
+  title: string;
+  description: string;
+  icon: IconName;
+}
+
+/** A compact promise in the trust strip below the hero. */
+export interface TrustItem {
+  id: string;
+  label: string;
+  detail: string;
+  icon: IconName;
+}
+
+/** Re-exported so data files describe icons without importing components. */
+export type IconName =
+  | "search"
+  | "user"
+  | "bag"
+  | "menu"
+  | "close"
+  | "arrowRight"
+  | "sparkle"
+  | "truck"
+  | "shield"
+  | "mail"
+  | "heart"
+  | "star"
+  | "check"
+  | "lock"
+  | "globe"
+  | "chat"
+  | "layers"
+  | "refresh";

@@ -7,6 +7,10 @@ const variantStyles = {
   brand: "bg-brand-primary-soft text-brand-primary border border-border-highlight",
   /** Solid gradient pill — the loudest badge, one per view at most. */
   gradient: "gradient-brand text-white border border-transparent shadow-soft",
+  /** Frosted pill for labels floating over artwork. */
+  glass: "glass text-foreground",
+  /** Solid pill that stays legible floating over any surface. */
+  floating: "bg-surface text-foreground border border-border shadow-card",
   new: "bg-brand-secondary-soft text-brand-secondary border border-transparent",
   trending: "bg-brand-accent-soft text-brand-accent border border-transparent",
   bestseller: "bg-brand-highlight-soft text-brand-highlight border border-transparent",

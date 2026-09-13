@@ -38,6 +38,9 @@ const variantStyles = {
     "bg-transparent text-foreground-muted hover:bg-surface-muted hover:text-foreground",
   destructive:
     "bg-danger text-white shadow-soft hover:brightness-110 hover:-translate-y-0.5",
+  /** For dark campaign panels: a light pill that reads on deep navy. */
+  inverse:
+    "bg-white text-navy-950 shadow-soft hover:-translate-y-0.5 hover:shadow-glow-accent",
 } as const;
 
 const sizeStyles = {

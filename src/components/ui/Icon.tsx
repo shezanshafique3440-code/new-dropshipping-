@@ -1,10 +1,14 @@
 import type { ReactElement } from "react";
 
+import type { IconName } from "@/types";
+
 /**
  * Inline UI glyphs on a 24×24 grid, stroked with `currentColor`.
- * Kept in-repo so the interface needs no icon dependency.
+ * Kept in-repo so the interface needs no icon dependency. The `IconName`
+ * union lives in `@/types`, so data files can name an icon without importing
+ * a component — and the compiler flags any name without a glyph here.
  */
-const glyphs = {
+const glyphs: Record<IconName, ReactElement> = {
   search: (
     <>
       <circle cx="11" cy="11" r="6.5" />
@@ -52,25 +56,69 @@ const glyphs = {
       <path d="m4.25 7 7.75 6 7.75-6" />
     </>
   ),
-} satisfies Record<string, ReactElement>;
+  heart: (
+    <path d="M12 19.5c-4.6-2.9-7.5-5.85-7.5-9.2A3.95 3.95 0 0 1 12 8.1a3.95 3.95 0 0 1 7.5 2.2c0 3.35-2.9 6.3-7.5 9.2Z" />
+  ),
+  star: (
+    <path d="m12 4 2.45 4.96 5.05.73-3.65 3.56.86 5.03L12 15.9l-4.71 2.38.86-5.03L4.5 9.69l5.05-.73L12 4Z" />
+  ),
+  check: <path d="m5 12.5 4.5 4.5L19 7.5" />,
+  lock: (
+    <>
+      <rect x="4.75" y="10.5" width="14.5" height="9.25" rx="2.25" />
+      <path d="M8.25 10.5v-2.5a3.75 3.75 0 0 1 7.5 0v2.5" />
+    </>
+  ),
+  globe: (
+    <>
+      <circle cx="12" cy="12" r="8.25" />
+      <path d="M3.9 12h16.2M12 3.75c2.1 2.3 3.2 5.2 3.2 8.25S14.1 18 12 20.25c-2.1-2.25-3.2-5.2-3.2-8.25S9.9 6.05 12 3.75Z" />
+    </>
+  ),
+  chat: (
+    <>
+      <path d="M4.75 6.5h14.5v9.25H10L5.75 19v-3.25H4.75z" />
+      <path d="M9 11h6" />
+    </>
+  ),
+  layers: (
+    <>
+      <path d="m12 4 7.5 4-7.5 4-7.5-4L12 4Z" />
+      <path d="m5.25 12.5 6.75 3.6 6.75-3.6M5.25 16.25 12 19.85l6.75-3.6" />
+    </>
+  ),
+  refresh: (
+    <>
+      <path d="M19 12a7 7 0 1 1-2.4-5.3" />
+      <path d="M19.5 5v4h-4" />
+    </>
+  ),
+};
 
-export type IconName = keyof typeof glyphs;
+export type { IconName };
 
 export interface IconProps {
   name: IconName;
   className?: string;
   /** Stroke width on the 24×24 grid. */
   strokeWidth?: number;
+  /** Fills the glyph with `currentColor` instead of stroking it. */
+  filled?: boolean;
 }
 
-export function Icon({ name, className = "size-5", strokeWidth = 1.6 }: IconProps) {
+export function Icon({
+  name,
+  className = "size-5",
+  strokeWidth = 1.6,
+  filled = false,
+}: IconProps) {
   return (
     <svg
       aria-hidden="true"
       viewBox="0 0 24 24"
-      fill="none"
+      fill={filled ? "currentColor" : "none"}
       stroke="currentColor"
-      strokeWidth={strokeWidth}
+      strokeWidth={filled ? 0 : strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
