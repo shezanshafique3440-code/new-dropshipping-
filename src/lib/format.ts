@@ -16,6 +16,16 @@ export function formatPrice(
   }).format(amount);
 }
 
+/**
+ * Fills an `{amount}` placeholder in configured copy with a formatted price,
+ * so currency lives in the config rather than in component markup.
+ */
+export function withPrice(template: string, amount: number | undefined): string {
+  return amount === undefined
+    ? template
+    : template.replace("{amount}", formatPrice(amount, { maximumFractionDigits: 0 }));
+}
+
 /** Formats a date using the storefront locale. */
 export function formatDate(
   date: Date | string | number,

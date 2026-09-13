@@ -30,7 +30,7 @@ export default function ContactPage() {
           <dl className="grid gap-6 sm:grid-cols-3">
             {details.map((detail) => (
               <div key={detail.label} className="flex flex-col gap-1">
-                <dt className="text-xs font-medium tracking-wide text-foreground-muted uppercase">
+                <dt className="type-eyebrow text-brand-primary">
                   {detail.label}
                 </dt>
                 <dd className="text-sm break-words">{detail.value}</dd>

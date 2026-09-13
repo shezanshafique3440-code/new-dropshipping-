@@ -6,10 +6,12 @@ import type { SiteConfig } from "@/types";
  * details. Nothing in the UI should hard-code these values.
  */
 export const siteConfig: SiteConfig = {
-  name: env.storeName ?? "Aurelia",
-  tagline: "Curated goods, delivered worldwide",
+  name: env.storeName ?? "ZYVERO",
+  tagline: "Discover. Choose. Enjoy.",
   description:
-    "Aurelia is a modern dropshipping storefront for design-led essentials — curated collections, fast worldwide delivery and a checkout that stays out of your way.",
+    "ZYVERO is a modern international storefront for design-led essentials — a curated edit, fast worldwide delivery and a checkout that stays out of your way.",
+  shortDescription:
+    "A curated edit of design-led essentials, shipped worldwide.",
   url: env.siteUrl,
   locale: "en-US",
   currency: {
@@ -20,6 +22,17 @@ export const siteConfig: SiteConfig = {
     email: "support@example.com",
     phone: "+1 (000) 000-0000",
     address: "Remote-first — we ship from partner warehouses worldwide.",
+  },
+  announcement: {
+    message: "Free worldwide delivery on orders over {amount}",
+    amount: 75,
+    cta: { label: "See details", href: "/contact" },
+  },
+  newsletter: {
+    title: "Join the ZYVERO list",
+    description:
+      "Early access to new drops, restocks and members-only pricing.",
+    note: "Sign-ups open when the store launches.",
   },
   nav: {
     main: [
@@ -34,27 +47,31 @@ export const siteConfig: SiteConfig = {
         title: "Shop",
         items: [
           { label: "All products", href: "/shop" },
-          { label: "Cart", href: "/cart" },
+          { label: "New arrivals", href: "/shop" },
+          { label: "Your cart", href: "/cart" },
         ],
       },
       {
         title: "Account",
         items: [
-          { label: "Your account", href: "/account" },
+          { label: "Sign in", href: "/account" },
           { label: "Orders", href: "/account" },
+          { label: "Preferences", href: "/account" },
         ],
       },
       {
         title: "Support",
         items: [
           { label: "Contact us", href: "/contact" },
-          { label: "Shipping & returns", href: "/contact" },
+          { label: "Shipping", href: "/contact" },
+          { label: "Returns", href: "/contact" },
         ],
       },
     ],
     legal: [
       { label: "Privacy", href: "/contact" },
       { label: "Terms", href: "/contact" },
+      { label: "Cookies", href: "/contact" },
     ],
   },
   social: [

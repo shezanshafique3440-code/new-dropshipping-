@@ -5,7 +5,8 @@ import { cn } from "@/lib/utils";
 const sizeStyles = {
   sm: "max-w-3xl",
   md: "max-w-5xl",
-  lg: "max-w-7xl",
+  /** Default: the page width defined by `--container-page`. */
+  lg: "",
   full: "max-w-none",
 } as const;
 

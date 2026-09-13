@@ -1,7 +1,8 @@
 {
-  "name": "aurelia-storefront",
+  "name": "zyvero-storefront",
   "version": "0.1.0",
   "private": true,
+  "description": "ZYVERO — a premium international storefront built with Next.js, TypeScript and Tailwind CSS.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -25,6 +26,5 @@
     "eslint-config-next": "16.3.5",
     "tailwindcss": "^4",
     "typescript": "^5"
-  },
-  "description": "Premium dropshipping storefront built with Next.js, TypeScript and Tailwind CSS."
+  }
 }

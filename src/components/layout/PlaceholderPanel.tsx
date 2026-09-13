@@ -1,5 +1,6 @@
 import { Card, CardContent, CardTitle } from "@/components/ui/Card";
 import { Container } from "@/components/ui/Container";
+import { Icon } from "@/components/ui/Icon";
 
 export interface PlaceholderPanelProps {
   title: string;
@@ -15,20 +16,19 @@ export function PlaceholderPanel({ title, items }: PlaceholderPanelProps) {
   return (
     <section className="section-y">
       <Container size="md">
-        <Card variant="muted" className="shadow-none">
-          <CardContent className="flex flex-col gap-4">
+        <Card variant="elevated">
+          <CardContent className="flex flex-col gap-5">
             <CardTitle>{title}</CardTitle>
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col gap-3">
               {items.map((item) => (
-                <li
-                  key={item}
-                  className="flex items-start gap-3 text-sm text-foreground-muted"
-                >
+                <li key={item} className="flex items-start gap-3 text-sm">
                   <span
                     aria-hidden="true"
-                    className="mt-2 size-1.5 shrink-0 rounded-full bg-primary"
-                  />
-                  {item}
+                    className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-brand-primary-soft text-brand-primary"
+                  >
+                    <Icon name="arrowRight" className="size-3" strokeWidth={2} />
+                  </span>
+                  <span className="text-foreground-muted">{item}</span>
                 </li>
               ))}
             </ul>

@@ -3,9 +3,16 @@ import type { ElementType, HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 const variantStyles = {
-  solid: "bg-surface border border-border",
+  /** Flat surface with a hairline border. */
+  default: "bg-surface border border-border shadow-soft",
+  /** Lifted panel for content that should read as a layer above the page. */
+  elevated: "bg-surface-elevated border border-border-subtle shadow-card",
+  /** Frosted panel for overlays and promotional moments. */
+  glass: "glass shadow-card",
+  /** Hairline gradient outline — reserve for one or two highlights per view. */
+  gradient: "gradient-border bg-surface shadow-card",
+  /** Borderless tinted block, used for quiet informational panels. */
   muted: "bg-surface-muted border border-transparent",
-  glass: "glass",
 } as const;
 
 export type CardVariant = keyof typeof variantStyles;
@@ -13,24 +20,29 @@ export type CardVariant = keyof typeof variantStyles;
 export interface CardProps extends HTMLAttributes<HTMLElement> {
   as?: ElementType;
   variant?: CardVariant;
-  /** Adds a lift-on-hover interaction, used by product cards later on. */
+  /** Adds the shared hover lift and shadow response. */
   interactive?: boolean;
+  /** Adds a brand glow on hover — pair with `interactive`, use sparingly. */
+  glow?: boolean;
 }
 
-/** Surface primitive shared by product cards, panels and empty states. */
+/** Surface primitive shared by panels, empty states and future product cards. */
 export function Card({
   as: Component = "div",
-  variant = "solid",
+  variant = "default",
   interactive = false,
+  glow = false,
   className,
   ...props
 }: CardProps) {
   return (
     <Component
       className={cn(
-        "rounded-2xl shadow-soft transition-[transform,box-shadow] duration-300 ease-[var(--ease-out-soft)]",
+        "rounded-2xl",
         variantStyles[variant],
-        interactive && "hover:-translate-y-1 hover:shadow-lifted",
+        interactive && "hover-lift hover-zoom",
+        interactive && glow && "hover:shadow-glow-primary",
+        interactive && "hover:border-border-highlight",
         className,
       )}
       {...props}
@@ -42,14 +54,16 @@ export function CardHeader({
   className,
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex flex-col gap-2 p-6 pb-0", className)} {...props} />;
+  return (
+    <div className={cn("flex flex-col gap-2 p-6 pb-0", className)} {...props} />
+  );
 }
 
 export function CardTitle({
   className,
   ...props
 }: HTMLAttributes<HTMLHeadingElement>) {
-  return <h3 className={cn("text-lg font-semibold", className)} {...props} />;
+  return <h3 className={cn("type-h3", className)} {...props} />;
 }
 
 export function CardDescription({
@@ -57,10 +71,7 @@ export function CardDescription({
   ...props
 }: HTMLAttributes<HTMLParagraphElement>) {
   return (
-    <p
-      className={cn("text-sm leading-relaxed text-foreground-muted", className)}
-      {...props}
-    />
+    <p className={cn("text-sm text-foreground-muted", className)} {...props} />
   );
 }
 

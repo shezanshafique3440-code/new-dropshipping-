@@ -1,29 +1,51 @@
 import Link, { type LinkProps } from "next/link";
-import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "react";
+import type {
+  AnchorHTMLAttributes,
+  ButtonHTMLAttributes,
+  ReactNode,
+} from "react";
 
 import { cn } from "@/lib/utils";
 
-const base =
-  "inline-flex items-center justify-center gap-2 rounded-full font-medium " +
-  "whitespace-nowrap transition-[background-color,box-shadow,transform,color] " +
-  "duration-200 ease-[var(--ease-out-soft)] active:translate-y-px " +
-  "disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none " +
-  "aria-disabled:opacity-50";
+/**
+ * Shared behaviour for every variant: fast, restrained transitions, a visible
+ * focus ring, a small press-down on active and an unmistakable disabled state.
+ */
+const base = [
+  "relative inline-flex items-center justify-center gap-2 rounded-full",
+  "font-semibold whitespace-nowrap select-none",
+  "transition-[background-color,border-color,color,box-shadow,transform,filter]",
+  "duration-200 ease-[var(--ease-out-soft)]",
+  "active:scale-[0.98]",
+  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary",
+  "disabled:pointer-events-none disabled:opacity-45 disabled:shadow-none",
+  "aria-disabled:pointer-events-none aria-disabled:opacity-45 aria-disabled:shadow-none",
+].join(" ");
 
 const variantStyles = {
+  /** Solid brand fill — the default call to action. */
   primary:
-    "bg-primary text-primary-foreground shadow-soft hover:bg-primary-hover hover:shadow-glow",
-  accent:
-    "bg-accent text-accent-foreground shadow-soft hover:brightness-110 hover:shadow-glow",
+    "bg-brand-fill text-white shadow-soft hover:bg-brand-fill-hover hover:-translate-y-0.5 hover:shadow-glow-primary",
+  /** The signature blue → violet → pink gradient, for hero moments. */
+  gradient:
+    "gradient-brand bg-[length:180%_100%] bg-[position:0%_50%] text-white shadow-soft hover:bg-[position:100%_50%] hover:-translate-y-0.5 hover:shadow-glow-primary",
+  /** Quiet filled button for secondary actions on any surface. */
+  secondary:
+    "bg-surface-muted text-foreground shadow-none hover:bg-brand-primary-soft hover:text-brand-primary",
   outline:
-    "border border-border-strong bg-transparent text-foreground hover:border-primary hover:text-primary",
-  ghost: "bg-transparent text-foreground-muted hover:bg-surface-muted hover:text-foreground",
+    "border border-border-strong bg-transparent text-foreground hover:border-brand-primary hover:text-brand-primary hover:shadow-soft",
+  ghost:
+    "bg-transparent text-foreground-muted hover:bg-surface-muted hover:text-foreground",
+  destructive:
+    "bg-danger text-white shadow-soft hover:brightness-110 hover:-translate-y-0.5",
 } as const;
 
 const sizeStyles = {
-  sm: "h-9 px-4 text-sm",
+  sm: "h-9 px-4 text-[0.8125rem]",
   md: "h-11 px-6 text-sm",
   lg: "h-13 px-8 text-base",
+  /** Square target for icon-only actions — always pair with an aria-label. */
+  icon: "size-11 p-0",
 } as const;
 
 export type ButtonVariant = keyof typeof variantStyles;

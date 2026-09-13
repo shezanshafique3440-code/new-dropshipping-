@@ -1,13 +1,29 @@
+import type { ReactElement } from "react";
+
 import type { SocialIconName } from "@/types";
 
-const paths: Record<SocialIconName, string> = {
-  instagram:
-    "M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5Zm5 5.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9ZM17.8 6.2h.01",
-  tiktok:
-    "M14 3v10.6a3.4 3.4 0 1 1-2.7-3.33M14 3c.3 2.4 1.9 4 4.3 4.2M14 3h.1",
-  x: "M4 4l16 16M20 4L4 20",
-  youtube:
-    "M2.5 8.2A3.2 3.2 0 0 1 5.7 5h12.6a3.2 3.2 0 0 1 3.2 3.2v7.6a3.2 3.2 0 0 1-3.2 3.2H5.7a3.2 3.2 0 0 1-3.2-3.2V8.2ZM10.2 9.3l4.6 2.7-4.6 2.7V9.3Z",
+/** Simplified social marks on the same 24×24 grid as {@link Icon}. */
+const glyphs: Record<SocialIconName, ReactElement> = {
+  instagram: (
+    <>
+      <rect x="3.75" y="3.75" width="16.5" height="16.5" rx="4.75" />
+      <circle cx="12" cy="12" r="3.9" />
+      <path d="M17.15 6.9h.01" />
+    </>
+  ),
+  tiktok: (
+    <>
+      <path d="M13.6 3.5v10.75a3.35 3.35 0 1 1-2.9-3.32" />
+      <path d="M13.6 6.1a4.6 4.6 0 0 0 4.4 3.3" />
+    </>
+  ),
+  x: <path d="M4.5 4.5l15 15m0-15-15 15" />,
+  youtube: (
+    <>
+      <rect x="3" y="6" width="18" height="12" rx="3.5" />
+      <path d="m10.6 9.6 4.4 2.4-4.4 2.4V9.6Z" />
+    </>
+  ),
 };
 
 export interface SocialIconProps {
@@ -15,7 +31,6 @@ export interface SocialIconProps {
   className?: string;
 }
 
-/** Inline social glyph — keeps the footer icon set dependency-free. */
 export function SocialIcon({ name, className = "size-4" }: SocialIconProps) {
   return (
     <svg
@@ -28,7 +43,7 @@ export function SocialIcon({ name, className = "size-4" }: SocialIconProps) {
       strokeLinejoin="round"
       className={className}
     >
-      <path d={paths[name]} />
+      {glyphs[name]}
     </svg>
   );
 }

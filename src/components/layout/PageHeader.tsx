@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { Badge } from "@/components/ui/Badge";
 import { Container } from "@/components/ui/Container";
 import { cn } from "@/lib/utils";
 
@@ -24,21 +25,15 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        "border-b border-border bg-background-subtle py-14 md:py-20",
+        "gradient-hero border-b border-border-subtle py-14 md:py-20",
         className,
       )}
     >
-      <Container className="flex max-w-3xl flex-col items-start gap-4">
-        {eyebrow ? (
-          <span className="rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium tracking-wide text-foreground-muted uppercase">
-            {eyebrow}
-          </span>
-        ) : null}
-        <h1 className="text-3xl font-semibold sm:text-4xl">{title}</h1>
+      <Container className="flex max-w-3xl flex-col items-start gap-5">
+        {eyebrow ? <Badge variant="brand">{eyebrow}</Badge> : null}
+        <h1 className="type-h1">{title}</h1>
         {description ? (
-          <p className="text-base leading-relaxed text-foreground-muted">
-            {description}
-          </p>
+          <p className="type-body-lg text-foreground-muted">{description}</p>
         ) : null}
         {actions ? <div className="flex flex-wrap gap-3">{actions}</div> : null}
       </Container>

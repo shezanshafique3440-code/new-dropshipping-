@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 
+import { Badge } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
 
@@ -20,18 +21,14 @@ export default function ErrorBoundary({ error, reset }: ErrorBoundaryProps) {
   return (
     <div className="section-y">
       <Container size="sm" className="flex flex-col items-start gap-5">
-        <span className="rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium tracking-wide text-foreground-muted uppercase">
-          Something went wrong
-        </span>
-        <h1 className="text-3xl font-semibold sm:text-4xl">
-          This page failed to load
-        </h1>
-        <p className="text-base leading-relaxed text-foreground-muted">
+        <Badge variant="sale">Something went wrong</Badge>
+        <h1 className="type-h1">This page failed to load</h1>
+        <p className="type-body-lg text-foreground-muted">
           An unexpected error interrupted the page. Try again — if it keeps
           happening, get in touch and we will look into it.
         </p>
         {error.digest ? (
-          <p className="font-mono text-xs text-foreground-muted">
+          <p className="font-mono text-xs text-foreground-subtle">
             Reference: {error.digest}
           </p>
         ) : null}

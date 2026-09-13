@@ -1,19 +1,44 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 
 import { NavLink } from "@/components/layout/NavLink";
+import { SearchTrigger } from "@/components/layout/SearchTrigger";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import { useLockBodyScroll } from "@/hooks/useLockBodyScroll";
+import { cn } from "@/lib/utils";
 import type { NavItem } from "@/types";
+
+const shortcuts: ReadonlyArray<{
+  href: string;
+  icon: IconName;
+  label: string;
+}> = [
+  { href: "/account", icon: "user", label: "Account" },
+  { href: "/cart", icon: "bag", label: "Cart" },
+];
 
 export interface MobileMenuProps {
   items: readonly NavItem[];
 }
 
-/** Small-screen navigation drawer for the site header. */
+/**
+ * Small-screen navigation drawer. The panel stays mounted so it can transition
+ * smoothly, and is made `inert` while closed so it leaves the tab order and
+ * the accessibility tree.
+ */
 export function MobileMenu({ items }: MobileMenuProps) {
-  const [open, setOpen] = useState(false);
   const panelId = useId();
+  const pathname = usePathname();
+  /**
+   * The route the drawer was opened on. Deriving `open` from it means a
+   * navigation — including browser back/forward — closes the drawer without
+   * an effect that re-renders on every route change.
+   */
+  const [openedOn, setOpenedOn] = useState<string | null>(null);
+  const open = openedOn === pathname;
 
   useLockBodyScroll(open);
 
@@ -24,7 +49,7 @@ export function MobileMenu({ items }: MobileMenuProps) {
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setOpen(false);
+        setOpenedOn(null);
       }
     };
 
@@ -32,52 +57,70 @@ export function MobileMenu({ items }: MobileMenuProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [open]);
 
+  const close = () => setOpenedOn(null);
+
   return (
-    <div className="md:hidden">
+    <>
       <button
         type="button"
         aria-expanded={open}
         aria-controls={panelId}
         aria-label={open ? "Close menu" : "Open menu"}
-        onClick={() => setOpen((value) => !value)}
-        className="inline-flex size-10 items-center justify-center rounded-full border border-border text-foreground transition-colors hover:bg-surface-muted"
+        onClick={() => setOpenedOn(open ? null : pathname)}
+        className="inline-flex size-10 items-center justify-center rounded-full border border-border text-foreground transition-colors duration-200 hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary lg:hidden"
       >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.75"
-          strokeLinecap="round"
-          className="size-5"
-        >
-          {open ? (
-            <path d="M6 6l12 12M18 6L6 18" />
-          ) : (
-            <path d="M4 7h16M4 12h16M4 17h16" />
-          )}
-        </svg>
+        <Icon name={open ? "close" : "menu"} className="size-5" />
       </button>
 
-      {open ? (
-        <div
-          id={panelId}
-          className="fixed inset-x-0 top-16 z-40 border-b border-border bg-background px-4 pb-6 shadow-lifted"
-        >
-          <nav aria-label="Mobile" className="flex flex-col">
-            {items.map((item) => (
-              <NavLink
-                key={item.href}
-                href={item.href}
-                onNavigate={() => setOpen(false)}
-                className="border-b border-border px-2 py-4 text-base last:border-b-0"
-              >
-                {item.label}
-              </NavLink>
-            ))}
+      <div
+        id={panelId}
+        inert={!open}
+        className={cn(
+          "absolute inset-x-0 top-full z-50 origin-top border-b border-border bg-surface shadow-floating transition-[opacity,transform] duration-300 ease-[var(--ease-out-soft)] lg:hidden",
+          open
+            ? "translate-y-0 opacity-100"
+            : "pointer-events-none -translate-y-2 opacity-0",
+        )}
+      >
+        <div className="container-page flex max-h-[calc(100dvh-8rem)] flex-col gap-5 overflow-y-auto py-5">
+          <SearchTrigger />
+
+          <nav aria-label="Mobile">
+            <ul className="flex flex-col">
+              {items.map((item) => (
+                <li key={item.href}>
+                  <NavLink
+                    href={item.href}
+                    onNavigate={close}
+                    className="flex items-center justify-between border-b border-border-subtle px-1 py-3.5 text-base font-medium"
+                    activeClassName="text-brand-primary"
+                  >
+                    {item.label}
+                    <Icon
+                      name="arrowRight"
+                      className="size-4 text-foreground-subtle"
+                    />
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
           </nav>
+
+          <div className="grid grid-cols-2 gap-3">
+            {shortcuts.map((shortcut) => (
+              <Link
+                key={shortcut.href}
+                href={shortcut.href}
+                onClick={close}
+                className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface-muted px-4 py-3 text-sm font-semibold text-foreground transition-colors duration-200 hover:border-border-highlight focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+              >
+                <Icon name={shortcut.icon} className="size-[1.15rem]" />
+                {shortcut.label}
+              </Link>
+            ))}
+          </div>
         </div>
-      ) : null}
-    </div>
+      </div>
+    </>
   );
 }

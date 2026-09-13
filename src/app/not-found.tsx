@@ -14,11 +14,9 @@ export default function NotFound() {
   return (
     <div className="section-y">
       <Container size="sm" className="flex flex-col items-start gap-5">
-        <span className="text-6xl font-semibold text-gradient-brand sm:text-7xl">
-          404
-        </span>
-        <h1 className="text-3xl font-semibold sm:text-4xl">Page not found</h1>
-        <p className="text-base leading-relaxed text-foreground-muted">
+        <span className="type-display w-fit text-gradient-brand">404</span>
+        <h1 className="type-h1">Page not found</h1>
+        <p className="type-body-lg text-foreground-muted">
           The page you were looking for has moved or never existed. These links
           will get you back on track.
         </p>
@@ -34,7 +32,7 @@ export default function NotFound() {
               <li key={item.href}>
                 <Link
                   href={item.href}
-                  className="transition-colors hover:text-foreground"
+                  className="link-underline hover:text-foreground"
                 >
                   {item.label}
                 </Link>

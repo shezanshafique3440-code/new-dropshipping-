@@ -43,8 +43,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#080b14" },
+    { media: "(prefers-color-scheme: light)", color: "#fcfcfd" },
+    { media: "(prefers-color-scheme: dark)", color: "#07080f" },
   ],
 };
 
@@ -56,7 +56,7 @@ export default function RootLayout({
       <body className="flex min-h-dvh flex-col">
         <a
           href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-100 focus:rounded-full focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:text-primary-foreground"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-100 focus:rounded-full focus:bg-brand-fill focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white focus:shadow-floating"
         >
           Skip to content
         </a>

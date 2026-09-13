@@ -43,14 +43,35 @@ export interface ContactConfig {
   address: string;
 }
 
+/** Promo strip above the header. */
+export interface AnnouncementConfig {
+  /** Copy for the strip. `{amount}` is replaced with the formatted threshold. */
+  message: string;
+  /** Value substituted into `{amount}`, in major currency units. */
+  amount?: number;
+  /** Optional call to action rendered at the end of the strip. */
+  cta?: NavItem;
+}
+
+export interface NewsletterConfig {
+  title: string;
+  description: string;
+  /** Shown under the field while sign-up is not yet wired up. */
+  note: string;
+}
+
 export interface SiteConfig {
   name: string;
   tagline: string;
   description: string;
+  /** One-line brand summary used in the footer and compact contexts. */
+  shortDescription: string;
   url: string;
   locale: string;
   currency: CurrencyConfig;
   contact: ContactConfig;
+  announcement: AnnouncementConfig;
+  newsletter: NewsletterConfig;
   nav: {
     main: readonly NavItem[];
     footer: readonly NavGroup[];
