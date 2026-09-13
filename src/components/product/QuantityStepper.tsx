@@ -1,33 +1,63 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId } from "react";
 
 import { Icon } from "@/components/ui/Icon";
-
-const MIN = 1;
-const MAX = 10;
+import { MAX_LINE_QUANTITY } from "@/lib/cart";
+import { cn } from "@/lib/utils";
 
 export interface QuantityStepperProps {
-  onChange?: (quantity: number) => void;
+  value: number;
+  onChange: (quantity: number) => void;
+  /** Names the thing being counted, e.g. "AeroPulse Wireless Headphones". */
+  label?: string;
+  size?: "sm" | "md";
+  /** Hides the visible "Quantity" caption; the group stays labelled for AT. */
+  hideLabel?: boolean;
+  className?: string;
 }
 
-/** Quantity control for the product page. Local state only — no cart yet. */
-export function QuantityStepper({ onChange }: QuantityStepperProps) {
-  const [quantity, setQuantity] = useState(MIN);
+const MIN = 1;
+
+const sizeStyles = {
+  sm: { button: "size-8", text: "w-7 text-sm", icon: "size-3.5" },
+  md: { button: "size-10", text: "w-8 text-sm", icon: "size-4" },
+} as const;
+
+/**
+ * Controlled quantity stepper.
+ *
+ * Minus is disabled at 1 — removing a line is a separate, explicit action, so
+ * a stray click can never silently empty a cart line.
+ */
+export function QuantityStepper({
+  value,
+  onChange,
+  label,
+  size = "md",
+  hideLabel = false,
+  className,
+}: QuantityStepperProps) {
   const id = useId();
+  const styles = sizeStyles[size];
+  const suffix = label ? ` of ${label}` : "";
 
-  const set = (value: number) => {
-    const next = Math.min(MAX, Math.max(MIN, value));
-    setQuantity(next);
-    onChange?.(next);
-  };
-
-  const buttonClass =
-    "grid size-10 place-items-center rounded-full text-foreground transition-colors duration-200 hover:bg-surface-muted disabled:opacity-40 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary";
+  const buttonClass = cn(
+    "grid place-items-center rounded-full text-foreground transition-colors duration-200",
+    "hover:bg-surface-muted disabled:opacity-40 disabled:hover:bg-transparent",
+    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary",
+    styles.button,
+  );
 
   return (
-    <div className="flex items-center gap-3">
-      <span id={id} className="type-caption text-foreground-subtle">
+    <div className={cn("flex items-center gap-3", className)}>
+      <span
+        id={id}
+        className={cn(
+          "type-caption text-foreground-subtle",
+          hideLabel && "sr-only",
+        )}
+      >
         Quantity
       </span>
       <div
@@ -37,27 +67,27 @@ export function QuantityStepper({ onChange }: QuantityStepperProps) {
       >
         <button
           type="button"
-          onClick={() => set(quantity - 1)}
-          disabled={quantity <= MIN}
-          aria-label="Decrease quantity"
+          onClick={() => onChange(Math.max(MIN, value - 1))}
+          disabled={value <= MIN}
+          aria-label={`Decrease quantity${suffix}`}
           className={buttonClass}
         >
-          <Icon name="minus" className="size-4" strokeWidth={2.5} />
+          <Icon name="minus" className={styles.icon} strokeWidth={2.5} />
         </button>
         <output
           aria-live="polite"
-          className="w-8 text-center text-sm font-semibold tabular-nums"
+          className={cn("text-center font-semibold tabular-nums", styles.text)}
         >
-          {quantity}
+          {value}
         </output>
         <button
           type="button"
-          onClick={() => set(quantity + 1)}
-          disabled={quantity >= MAX}
-          aria-label="Increase quantity"
+          onClick={() => onChange(Math.min(MAX_LINE_QUANTITY, value + 1))}
+          disabled={value >= MAX_LINE_QUANTITY}
+          aria-label={`Increase quantity${suffix}`}
           className={buttonClass}
         >
-          <Icon name="plus" className="size-4" strokeWidth={2.5} />
+          <Icon name="plus" className={styles.icon} strokeWidth={2.5} />
         </button>
       </div>
     </div>

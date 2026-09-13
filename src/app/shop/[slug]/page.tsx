@@ -2,11 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { AddToCartButton } from "@/components/product/AddToCartButton";
-import { FavoriteButton } from "@/components/product/FavoriteButton";
+import { ProductPurchasePanel } from "@/components/cart/ProductPurchasePanel";
 import { ProductArtwork } from "@/components/product/ProductArtwork";
 import { ProductCard } from "@/components/product/ProductCard";
-import { QuantityStepper } from "@/components/product/QuantityStepper";
 import { Rating } from "@/components/product/Rating";
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -238,13 +236,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
               ))}
             </ul>
 
-            <div className="flex flex-col gap-4 border-t border-border-subtle pt-6">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <QuantityStepper />
-                <FavoriteButton productName={product.name} />
-              </div>
-              <AddToCartButton productName={product.name} />
-            </div>
+            <ProductPurchasePanel product={product} />
 
             <ul className="grid gap-3 sm:grid-cols-3">
               {infoCards.map((info) => (

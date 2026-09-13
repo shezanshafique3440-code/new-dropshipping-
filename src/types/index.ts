@@ -60,6 +60,11 @@ export interface NewsletterConfig {
   note: string;
 }
 
+export interface ShippingConfig {
+  /** The storefront's stated free-delivery threshold, in major units. */
+  freeThreshold: number;
+}
+
 export interface SiteConfig {
   name: string;
   tagline: string;
@@ -70,6 +75,7 @@ export interface SiteConfig {
   locale: string;
   currency: CurrencyConfig;
   contact: ContactConfig;
+  shipping: ShippingConfig;
   announcement: AnnouncementConfig;
   newsletter: NewsletterConfig;
   nav: {
@@ -90,45 +96,44 @@ export interface SiteConfig {
  * ---------------------------------------------------------------------- */
 
 /** Key selecting one of the built-in SVG product illustrations. */
-export type ProductArtKey =
-  // Tech
-  | "headphones"
-  | "speaker"
-  | "keyboard"
-  | "chargingDock"
-  | "projector"
-  | "earbuds"
-  | "powerBank"
-  // Home
-  | "lamp"
-  | "diffuser"
-  | "deskLight"
-  | "deskOrganizer"
-  | "humidifier"
-  | "mug"
-  // Lifestyle
-  | "backpack"
-  | "slingBag"
-  | "travelOrganizer"
-  | "crossbody"
-  | "sportBottle"
-  // Beauty
-  | "facialSteamer"
-  | "mirror"
-  | "iceRoller"
-  | "facialTool"
-  | "skincare"
-  // Accessories
-  | "watch"
-  | "sunglasses"
-  | "wallet"
-  | "phoneStand"
-  | "keyOrganizer"
-  | "cardHolder"
-  // Everyday essentials
-  | "bottle"
-  | "storageBox"
-  | "multiTool";
+export const PRODUCT_ART_KEYS = [
+  "headphones",
+  "speaker",
+  "keyboard",
+  "chargingDock",
+  "projector",
+  "earbuds",
+  "powerBank",
+  "lamp",
+  "diffuser",
+  "deskLight",
+  "deskOrganizer",
+  "humidifier",
+  "mug",
+  "backpack",
+  "slingBag",
+  "travelOrganizer",
+  "crossbody",
+  "sportBottle",
+  "facialSteamer",
+  "mirror",
+  "iceRoller",
+  "facialTool",
+  "skincare",
+  "watch",
+  "sunglasses",
+  "wallet",
+  "phoneStand",
+  "keyOrganizer",
+  "cardHolder",
+  "bottle",
+  "storageBox",
+  "multiTool",
+  // Not a product: used by the empty-cart illustration.
+  "bag",
+] as const;
+
+export type ProductArtKey = (typeof PRODUCT_ART_KEYS)[number];
 
 /** The catalogue's top-level categories. */
 export const PRODUCT_CATEGORIES = [
@@ -148,7 +153,15 @@ export const PRODUCT_TAGS = ["bestSeller", "newArrival", "trending"] as const;
 export type ProductTag = (typeof PRODUCT_TAGS)[number];
 
 /** Colour family applied to generated artwork panels. */
-export type ArtTone = "violet" | "blue" | "cyan" | "magenta" | "neutral";
+export const ART_TONES = [
+  "violet",
+  "blue",
+  "cyan",
+  "magenta",
+  "neutral",
+] as const;
+
+export type ArtTone = (typeof ART_TONES)[number];
 
 /** Merchandising label shown on a product card. */
 export type ProductBadgeTone =
@@ -197,6 +210,40 @@ export interface Product {
   addedRank: number;
   art: ProductArtKey;
   tone: ArtTone;
+}
+
+/* -------------------------------------------------------------------------
+ * Cart
+ * ---------------------------------------------------------------------- */
+
+/**
+ * A line in the cart.
+ *
+ * Carries a snapshot of the product so the cart renders without re-reading the
+ * catalogue, and so a persisted cart survives a catalogue change. Lines are
+ * reconciled against the catalogue on load — see `@/lib/cart`.
+ */
+export interface CartItem {
+  productId: string;
+  slug: string;
+  name: string;
+  category: ProductCategory;
+  /** Unit price in major currency units. */
+  price: number;
+  /** Always a positive integer within the per-line maximum. */
+  quantity: number;
+  art: ProductArtKey;
+  tone: ArtTone;
+  badge?: ProductBadge;
+}
+
+export interface CartState {
+  items: readonly CartItem[];
+  /**
+   * False until the persisted cart has been read in the browser. Server and
+   * first client render share the same empty state, so nothing can mismatch.
+   */
+  hydrated: boolean;
 }
 
 /** Sort orders offered by the catalogue toolbar. */

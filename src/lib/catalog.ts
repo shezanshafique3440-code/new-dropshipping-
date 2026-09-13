@@ -1,4 +1,5 @@
 import { priceBounds, products } from "@/data/mock-storefront";
+import { productHref } from "@/lib/routes";
 import {
   PRODUCT_CATEGORIES,
   PRODUCT_TAGS,
@@ -10,10 +11,7 @@ import {
   type SortValue,
 } from "@/types";
 
-/** Canonical path for a product. */
-export function productHref(slug: string): string {
-  return `/shop/${slug}`;
-}
+export { productHref };
 
 export function findProductBySlug(slug: string): Product | undefined {
   return products.find((product) => product.slug === slug);

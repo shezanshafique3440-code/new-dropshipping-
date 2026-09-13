@@ -23,6 +23,9 @@ export const siteConfig: SiteConfig = {
     phone: "+1 (000) 000-0000",
     address: "Remote-first — we ship from partner warehouses worldwide.",
   },
+  shipping: {
+    freeThreshold: 75,
+  },
   announcement: {
     message: "Free worldwide delivery on orders over {amount}",
     amount: 75,

@@ -520,6 +520,17 @@ const glyphs: Record<ProductArtKey, ReactElement> = {
       <path d="M46 56 22 44M46 72H20" strokeOpacity="0.45" />
     </>
   ),
+  bag: (
+    <>
+      <path
+        d="M26 42h68l-6 54a12 12 0 0 1-12 10.5H44A12 12 0 0 1 32 96L26 42Z"
+        fill="currentColor"
+        fillOpacity="0.14"
+      />
+      <path d="M44 48V32a16 16 0 0 1 32 0v16" />
+      <path d="M40 66h40" strokeOpacity="0.4" />
+    </>
+  ),
   keyboard: (
     <>
       <rect

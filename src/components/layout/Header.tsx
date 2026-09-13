@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { WordmarkLink } from "@/components/brand/Wordmark";
+import { CartTrigger } from "@/components/cart/CartTrigger";
 import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
 import { MobileMenu } from "@/components/layout/MobileMenu";
 import { NavLink } from "@/components/layout/NavLink";
@@ -17,10 +18,7 @@ const quickActions: ReadonlyArray<{
   href: string;
   icon: IconName;
   label: string;
-}> = [
-  { href: "/account", icon: "user", label: "Account" },
-  { href: "/cart", icon: "bag", label: "Cart" },
-];
+}> = [{ href: "/account", icon: "user", label: "Account" }];
 
 /**
  * Storefront header: announcement strip, wordmark, primary navigation and the
@@ -78,6 +76,9 @@ export function Header() {
                 </Link>
               ))}
             </div>
+
+            {/* Outside the hidden wrapper: the cart stays reachable on phones. */}
+            <CartTrigger />
 
             <MobileMenu items={siteConfig.nav.main} />
           </div>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { AddToCartIconButton } from "@/components/cart/AddToCartIconButton";
 import { FavoriteButton } from "@/components/product/FavoriteButton";
 import { ProductArtwork } from "@/components/product/ProductArtwork";
 import { Rating } from "@/components/product/Rating";
@@ -102,16 +103,22 @@ export function ProductCard({
           <Rating value={rating.value} count={rating.count} />
         ) : null}
 
-        <p className="mt-auto flex items-baseline gap-2 pt-2">
-          <span className="text-base font-bold sm:text-lg">
-            {formatPrice(price)}
-          </span>
-          {compareAtPrice === undefined ? null : (
-            <span className="type-caption text-foreground-subtle line-through">
-              {formatPrice(compareAtPrice)}
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-2">
+          <p className="flex items-baseline gap-2">
+            <span className="text-base font-bold sm:text-lg">
+              {formatPrice(price)}
             </span>
-          )}
-        </p>
+            {compareAtPrice === undefined ? null : (
+              <span className="type-caption text-foreground-subtle line-through">
+                {formatPrice(compareAtPrice)}
+              </span>
+            )}
+          </p>
+          {/* `z-10` lifts it above the stretched link that covers the card. */}
+          <span className="relative z-10">
+            <AddToCartIconButton product={product} />
+          </span>
+        </div>
       </div>
     </Card>
   );
