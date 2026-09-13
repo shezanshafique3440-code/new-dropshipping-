@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getOrderRepository } from "@/server/orders/memory-repository";
+import { isDatabaseConfigured } from "@/server/db/config";
 import { isPaymentConfigured } from "@/server/payments/config";
 import {
   recordOrderForSession,
@@ -45,14 +45,19 @@ export async function GET(request: Request): Promise<Response> {
     return json(400, { state: "not_found" });
   }
 
-  if (!isPaymentConfigured()) {
-    console.error("[payments] Cannot verify payment: Stripe is not configured.");
-    return json(503, { state: "error", message: "Payment verification is unavailable." });
+  if (!isPaymentConfigured() || !isDatabaseConfigured()) {
+    console.error(
+      "[payments] Cannot verify payment: Stripe or the database is not configured.",
+    );
+    return json(503, {
+      state: "error",
+      message: "Payment verification is unavailable.",
+    });
   }
 
   try {
     const session = await getStripeClient().checkout.sessions.retrieve(sessionId);
-    const outcome = await recordOrderForSession(getOrderRepository(), session);
+    const outcome = await recordOrderForSession(session);
 
     if (outcome.kind === "recorded" && outcome.order.paymentStatus === "paid") {
       return json(200, { state: "paid", order: toPublicOrder(outcome.order) });

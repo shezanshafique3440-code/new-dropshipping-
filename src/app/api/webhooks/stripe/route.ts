@@ -1,7 +1,8 @@
 import type Stripe from "stripe";
 import { NextResponse } from "next/server";
 
-import { getOrderRepository } from "@/server/orders/memory-repository";
+import { isDatabaseConfigured } from "@/server/db/config";
+import { claimWebhookEvent, markOrderFailed } from "@/server/orders/service";
 import { getWebhookSecret, isPaymentConfigured } from "@/server/payments/config";
 import { recordOrderForSession } from "@/server/payments/record-order";
 import { getStripeClient } from "@/server/payments/stripe";
@@ -49,34 +50,37 @@ export async function POST(request: Request): Promise<Response> {
     return NextResponse.json({ error: "Invalid signature." }, { status: 400 });
   }
 
-  const repository = getOrderRepository();
-
-  const firstDelivery = await repository.claimEvent(event.id);
-  if (!firstDelivery) {
-    // Already handled. Acknowledge so Stripe stops retrying.
-    return NextResponse.json({ received: true, duplicate: true });
+  if (!isDatabaseConfigured()) {
+    // Nowhere to record the order. Fail loudly so Stripe keeps the event and
+    // retries once storage is back, rather than acknowledging a lost payment.
+    console.error("[webhook] No database configured; asking Stripe to retry.");
+    return NextResponse.json({ error: "Storage unavailable." }, { status: 503 });
   }
 
   try {
-    const handled = await handleEvent(repository, event);
+    const firstDelivery = await claimWebhookEvent(event.id, event.type);
+    if (!firstDelivery) {
+      // Already handled. Acknowledge so Stripe stops retrying.
+      return NextResponse.json({ received: true, duplicate: true });
+    }
+
+    const handled = await handleEvent(event);
     return NextResponse.json({ received: true, handled });
   } catch (error) {
-    // A 500 asks Stripe to retry; the claim above is per event id, and the
-    // order upsert makes a second attempt safe.
+    // A 500 asks Stripe to retry. Claiming the event and creating the order
+    // are both idempotent, so a retry re-runs this safely — and a database
+    // outage must never end with Stripe believing the event was handled.
     console.error(`[webhook] Failed to handle ${event.type}:`, describe(error));
     return NextResponse.json({ error: "Processing failed." }, { status: 500 });
   }
 }
 
-async function handleEvent(
-  repository: ReturnType<typeof getOrderRepository>,
-  event: Stripe.Event,
-): Promise<boolean> {
+async function handleEvent(event: Stripe.Event): Promise<boolean> {
   switch (event.type) {
     case "checkout.session.completed":
     case "checkout.session.async_payment_succeeded": {
       const session = event.data.object as Stripe.Checkout.Session;
-      const outcome = await recordOrderForSession(repository, session);
+      const outcome = await recordOrderForSession(session);
       if (outcome.kind === "recorded") {
         console.info(
           `[webhook] ${event.type}: order ${outcome.order.reference} ` +
@@ -90,7 +94,7 @@ async function handleEvent(
 
     case "checkout.session.async_payment_failed": {
       const session = event.data.object as Stripe.Checkout.Session;
-      const order = await repository.markFailed(session.id);
+      const order = await markOrderFailed(session.id);
       return order !== null;
     }
 

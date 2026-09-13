@@ -8,23 +8,16 @@ import type {
   NewOrder,
   OrderRepository,
 } from "./repository";
+import { canTransition, FAILED_STATE, PAID_STATE } from "./transitions";
 
 /**
  * In-memory order store.
  *
- * This repository holds orders for the life of the server process. That is
- * enough to make payment → order creation correct and testable end to end,
- * and it is deliberately not dressed up as production persistence: there is
- * no database in this repository yet, and writing orders to a JSON file would
- * be worse than useless (no atomicity, no concurrency control, a real risk of
- * losing a paid order). When the project gains a database, implement
- * `OrderRepository` against it and swap the factory below — nothing else
- * changes.
- *
- * Consequences while this adapter is in use:
- *   - orders do not survive a restart or a redeploy;
- *   - a multi-instance deployment would not share them.
- * Both are announced once at startup outside development.
+ * Kept for tests: it makes the order domain exercisable without a database,
+ * which is why the repository interface exists in the first place. The
+ * running application uses `PrismaOrderRepository` — orders here live only
+ * for the life of the process and are not shared between instances, so this
+ * adapter refuses to be used in production.
  */
 
 interface Store {
@@ -44,23 +37,27 @@ function getStore(): Store {
   return globals[globalKey];
 }
 
-let warned = false;
-
-function warnOnce(): void {
-  if (warned || process.env.NODE_ENV !== "production") {
-    return;
+function refuseInProduction(): void {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "The in-memory order repository is for tests only: orders would be lost " +
+        "on restart and would not be shared between instances.",
+    );
   }
-  warned = true;
-  console.warn(
-    "[orders] Using the in-memory order repository: orders are lost on restart " +
-      "and are not shared between instances. Provide a database-backed " +
-      "OrderRepository before taking live payments.",
-  );
 }
 
 export class MemoryOrderRepository implements OrderRepository {
   async findByCheckoutSessionId(sessionId: string): Promise<Order | null> {
     return getStore().ordersBySession.get(sessionId) ?? null;
+  }
+
+  async findByReference(reference: string): Promise<Order | null> {
+    for (const order of getStore().ordersBySession.values()) {
+      if (order.reference === reference) {
+        return order;
+      }
+    }
+    return null;
   }
 
   /**
@@ -71,7 +68,7 @@ export class MemoryOrderRepository implements OrderRepository {
    * typically) cannot both decide to insert.
    */
   async create(draft: NewOrder): Promise<CreateOrderResult> {
-    warnOnce();
+    refuseInProduction();
     const store = getStore();
     const existing = store.ordersBySession.get(draft.stripeCheckoutSessionId);
     if (existing) {
@@ -100,13 +97,12 @@ export class MemoryOrderRepository implements OrderRepository {
     if (!existing) {
       return null;
     }
-    if (existing.paymentStatus === "paid") {
+    if (!canTransition(existing, PAID_STATE)) {
       return existing;
     }
     const updated: Order = {
       ...existing,
-      status: "paid",
-      paymentStatus: "paid",
+      ...PAID_STATE,
       stripePaymentIntentId: paymentIntentId ?? existing.stripePaymentIntentId,
       updatedAt: new Date().toISOString(),
     };
@@ -121,13 +117,12 @@ export class MemoryOrderRepository implements OrderRepository {
       return null;
     }
     // Money that has already arrived is never talked out of having arrived.
-    if (existing.paymentStatus === "paid") {
+    if (!canTransition(existing, FAILED_STATE)) {
       return existing;
     }
     const updated: Order = {
       ...existing,
-      status: "failed",
-      paymentStatus: "failed",
+      ...FAILED_STATE,
       updatedAt: new Date().toISOString(),
     };
     store.ordersBySession.set(sessionId, updated);
@@ -135,6 +130,8 @@ export class MemoryOrderRepository implements OrderRepository {
   }
 
   async claimEvent(eventId: string): Promise<boolean> {
+    // The event type is only kept for diagnosis, which a test store has no
+    // use for; the interface's second argument is simply ignored here.
     const store = getStore();
     if (store.processedEvents.has(eventId)) {
       return false;
@@ -142,12 +139,4 @@ export class MemoryOrderRepository implements OrderRepository {
     store.processedEvents.add(eventId);
     return true;
   }
-}
-
-let repository: OrderRepository | null = null;
-
-/** The repository every payment path goes through. Swap the adapter here. */
-export function getOrderRepository(): OrderRepository {
-  repository ??= new MemoryOrderRepository();
-  return repository;
 }

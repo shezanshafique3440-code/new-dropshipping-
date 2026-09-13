@@ -1,0 +1,148 @@
+// ZYVERO — order persistence.
+//
+// Orders are the only records that outlive a request, and they are financial
+// records: every amount is an integer number of minor currency units (cents
+// for USD), and every line is a snapshot of what was actually bought rather
+// than a pointer into a catalogue that will keep changing.
+//
+// Development:  npm run db:migrate     (creates and applies a migration)
+// Deployment:   npm run db:deploy      (applies existing migrations only)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Prisma 7 keeps connection URLs out of the schema: migrations read
+// `DATABASE_URL` through prisma.config.ts, and the runtime client passes a
+// driver adapter (see src/server/db/client.ts). Nothing here holds a
+// credential.
+datasource db {
+  provider = "postgresql"
+}
+
+/// Where an order is in its own lifecycle. Deliberately separate from how the
+/// money is doing: a paid order can still be cancelled later, and a failed
+/// payment does not mean the order record should disappear.
+enum OrderStatus {
+  pending
+  paid
+  cancelled
+  failed
+}
+
+/// Where the money is. Owned by the payment provider's reality, not by us.
+enum PaymentStatus {
+  unpaid
+  paid
+  failed
+  refunded
+}
+
+model Order {
+  /// Internal identifier. Never shown to a customer and never in a URL.
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Customer-facing reference (ZYV-XXXXXX), minted from a CSPRNG so it
+  /// cannot be guessed or enumerated the way a sequential id can.
+  reference String @unique @db.VarChar(16)
+
+  status        OrderStatus   @default(pending)
+  paymentStatus PaymentStatus @default(unpaid)
+
+  /// ISO 4217, lowercase to match Stripe.
+  currency String @db.VarChar(3)
+
+  /// All amounts in minor units. Sum of the line totals.
+  subtotalAmount Int
+  shippingAmount Int @default(0)
+  /// No tax engine yet: always 0 today, modelled so adding one later is a
+  /// calculation change rather than a migration of historical orders.
+  taxAmount      Int @default(0)
+  /// No promotions yet, same reasoning.
+  discountAmount Int @default(0)
+  /// What the provider actually charged. The authority for reconciliation.
+  totalAmount    Int
+
+  customerEmail String  @db.VarChar(254)
+  customerName  String  @db.VarChar(200)
+  /// Reserved for the authenticated-account step: nothing sets this yet, and
+  /// order ownership is by email until real accounts exist.
+  customerId    String? @db.Uuid
+
+  shippingName       String? @db.VarChar(200)
+  shippingLine1      String? @db.VarChar(200)
+  shippingLine2      String? @db.VarChar(200)
+  shippingCity       String? @db.VarChar(120)
+  shippingRegion     String? @db.VarChar(120)
+  shippingPostalCode String? @db.VarChar(32)
+  /// ISO 3166-1 alpha-2.
+  shippingCountry    String? @db.VarChar(2)
+
+  deliveryOptionId String @db.VarChar(64)
+
+  /// One Checkout Session can only ever produce one order. This uniqueness —
+  /// not an application-level "check then insert" — is what makes duplicate
+  /// webhook deliveries and concurrent confirmations safe.
+  stripeCheckoutSessionId String  @unique @db.VarChar(255)
+  stripePaymentIntentId   String? @unique @db.VarChar(255)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  items OrderItem[]
+
+  /// Lookups a support agent or a future account page actually performs.
+  @@index([customerEmail])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([createdAt])
+  @@index([updatedAt])
+  @@index([customerId])
+  @@map("orders")
+}
+
+/// An immutable snapshot of one purchased line.
+///
+/// Nothing here is a foreign key into the catalogue on purpose: renaming or
+/// repricing a product must never change what an old order says was bought.
+model OrderItem {
+  id      String @id @default(uuid()) @db.Uuid
+  orderId String @db.Uuid
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  /// Catalogue identifiers, kept for reporting and reordering — not for
+  /// reconstructing price or name.
+  productId String  @db.VarChar(120)
+  slug      String  @db.VarChar(160)
+  /// Name as it was at the moment of purchase.
+  name      String  @db.VarChar(300)
+  category  String? @db.VarChar(80)
+
+  /// Unit price as charged, in minor units.
+  unitAmount Int
+  quantity   Int
+  /// unitAmount * quantity, stored rather than derived so a historical line
+  /// can never be re-multiplied differently.
+  lineAmount Int
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+/// Webhook deliveries already handled.
+///
+/// Stripe retries, and several instances may receive the same event. The
+/// primary key does the excluding: whoever inserts the id first owns the
+/// event, everyone else gets a unique-violation and stops.
+model ProcessedWebhookEvent {
+  /// Stripe's event id (evt_...).
+  id          String   @id @db.VarChar(255)
+  type        String   @db.VarChar(120)
+  processedAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([processedAt])
+  @@map("processed_webhook_events")
+}

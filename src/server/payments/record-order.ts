@@ -2,18 +2,25 @@ import type Stripe from "stripe";
 
 import type { Order, OrderShippingAddress } from "@/types";
 
-import type { NewOrder, OrderRepository } from "../orders/repository";
+import type { NewOrder } from "../orders/repository";
+import {
+  findOrderByCheckoutSession,
+  markOrderPaid,
+  recordOrder,
+  type OrderServiceOptions,
+} from "../orders/service";
 import { PAYMENT_CURRENCY } from "./config";
 import { decodeCartMetadata, sumOrderItems, toOrderItems } from "./line-items";
 
 /**
  * Turning a confirmed Stripe session into an order.
  *
- * This is the only place an order comes into existence, and both callers —
- * the webhook and the success page's verification endpoint — go through it.
- * Whichever arrives first creates the order; the other finds it. That is what
- * makes "one payment, one order" hold when Stripe retries a delivery, when
- * the shopper refreshes the success page, and when both happen at once.
+ * This is the only place a Stripe session becomes an order, and both callers
+ * — the webhook and the success page's verification endpoint — go through it.
+ * Whichever arrives first creates the order; the other finds it. Persistence
+ * and the state rules live in the order service below it, so "one payment,
+ * one order" is ultimately held by a unique index in PostgreSQL rather than
+ * by the ordering of two requests.
  */
 
 export type RecordOutcome =
@@ -21,8 +28,8 @@ export type RecordOutcome =
   | { kind: "ignored"; reason: string };
 
 export async function recordOrderForSession(
-  repository: OrderRepository,
   session: Stripe.Checkout.Session,
+  options?: OrderServiceOptions,
 ): Promise<RecordOutcome> {
   if (!session.id) {
     return { kind: "ignored", reason: "session-without-id" };
@@ -41,19 +48,33 @@ export async function recordOrderForSession(
     return { kind: "ignored", reason: "payment-not-completed" };
   }
 
-  const existing = await repository.findByCheckoutSessionId(session.id);
+  const existing = await findOrderByCheckoutSession(session.id, options);
   if (existing) {
     if (paid && existing.paymentStatus !== "paid") {
-      const updated = await repository.markPaid(
+      const updated = await markOrderPaid(
         session.id,
         readPaymentIntentId(session),
+        options,
       );
       return { kind: "recorded", order: updated ?? existing, created: false };
     }
     return { kind: "recorded", order: existing, created: false };
   }
 
-  const { order, created } = await repository.create(buildDraft(session, paid));
+  const { order, created } = await recordOrder(buildDraft(session, paid), options);
+
+  // Someone else created it between the lookup and the insert, and the
+  // repository handed us theirs. If theirs is not yet paid but this call
+  // knows the payment landed, settle it.
+  if (!created && paid && order.paymentStatus !== "paid") {
+    const settled = await markOrderPaid(
+      session.id,
+      readPaymentIntentId(session),
+      options,
+    );
+    return { kind: "recorded", order: settled ?? order, created: false };
+  }
+
   return { kind: "recorded", order, created };
 }
 

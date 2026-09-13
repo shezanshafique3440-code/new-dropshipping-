@@ -4,9 +4,9 @@ import type { Order, OrderStatus, OrderPaymentStatus } from "@/types";
  * Order persistence seam.
  *
  * This repository is the only thing the payment layer knows about storage.
- * The adapter behind it is in-memory today (see `memory-repository.ts`);
- * pointing it at Prisma, Postgres or another service is an implementation
- * swap in `getOrderRepository()`, not a change to any caller.
+ * PostgreSQL backs it in the running application (`prisma-repository.ts`);
+ * an in-memory adapter (`memory-repository.ts`) backs unit tests. Swapping
+ * either in happens in `getOrderRepository()`, not at any call site.
  *
  * Two invariants every adapter must uphold:
  *
@@ -42,6 +42,9 @@ export interface CreateOrderResult {
 export interface OrderRepository {
   findByCheckoutSessionId(sessionId: string): Promise<Order | null>;
 
+  /** Lookup by the customer-facing reference (ZYV-XXXXXX). */
+  findByReference(reference: string): Promise<Order | null>;
+
   /** Inserts, or returns the existing order for the same Checkout Session. */
   create(draft: NewOrder): Promise<CreateOrderResult>;
 
@@ -60,6 +63,7 @@ export interface OrderRepository {
   /**
    * Records a webhook event id, returning true only for the first caller.
    * Stripe retries deliveries, so this is what keeps handling exactly-once.
+   * The event type is stored alongside it purely for later diagnosis.
    */
-  claimEvent(eventId: string): Promise<boolean>;
+  claimEvent(eventId: string, eventType: string): Promise<boolean>;
 }
