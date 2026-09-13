@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import { CartProvider } from "@/components/cart/CartProvider";
 import { Footer } from "@/components/layout/Footer";
+import { SiteChrome } from "@/components/layout/SiteChrome";
 import { Header } from "@/components/layout/Header";
 import { siteConfig } from "@/config/site";
 import "@/styles/globals.css";
@@ -64,11 +65,15 @@ export default function RootLayout({
         </a>
         {/* Only cart-aware UI is client-side; `children` stay server-rendered. */}
         <CartProvider>
-          <Header />
+          <SiteChrome>
+            <Header />
+          </SiteChrome>
           <main id="main-content" className="flex-1">
             {children}
           </main>
-          <Footer />
+          <SiteChrome>
+            <Footer />
+          </SiteChrome>
           <CartDrawer />
         </CartProvider>
       </body>

@@ -246,6 +246,107 @@ export interface CartState {
   hydrated: boolean;
 }
 
+/* -------------------------------------------------------------------------
+ * Checkout
+ *
+ * Frontend-only for now: no payment is processed and no order is created, so
+ * nothing here models a transaction. Customer details live in component state
+ * for the length of the session and are never persisted — see `CheckoutShell`.
+ * ---------------------------------------------------------------------- */
+
+export const CHECKOUT_STEP_IDS = [
+  "information",
+  "delivery",
+  "payment",
+  "review",
+] as const;
+
+export type CheckoutStepId = (typeof CHECKOUT_STEP_IDS)[number];
+
+export interface CheckoutStep {
+  id: CheckoutStepId;
+  /** Shown in the progress indicator. */
+  label: string;
+  /** Page heading for the step. */
+  title: string;
+  description: string;
+}
+
+export interface CustomerInformation {
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+}
+
+export interface ShippingAddress {
+  /** ISO 3166-1 alpha-2 code, matching `@/data/countries`. */
+  country: string;
+  firstName: string;
+  lastName: string;
+  address1: string;
+  address2: string;
+  city: string;
+  region: string;
+  postalCode: string;
+  phone: string;
+}
+
+/** A delivery option. Rates arrive with the fulfilment integration. */
+export interface DeliveryOption {
+  id: string;
+  name: string;
+  /** What the shopper can expect, without promising a date. */
+  description: string;
+  /** Why no price is shown yet. */
+  note: string;
+}
+
+export const PAYMENT_METHOD_IDS = ["card", "wallet", "bank"] as const;
+
+export type PaymentMethodId = (typeof PAYMENT_METHOD_IDS)[number];
+
+export interface PaymentOption {
+  id: PaymentMethodId;
+  name: string;
+  description: string;
+  icon: IconName;
+}
+
+/**
+ * Payment is deliberately inert. The union has one member today; a connected
+ * gateway would add its own states rather than reinterpreting this one.
+ */
+export type PaymentStatus = {
+  kind: "not-connected";
+  /** Shown to the shopper, so the state is never mistaken for a live gateway. */
+  message: string;
+};
+
+/** Where the checkout has got to. */
+export type CheckoutOutcome =
+  | { kind: "editing" }
+  | { kind: "preview-notice" };
+
+export interface CheckoutState {
+  step: CheckoutStepId;
+  /** Steps the shopper has completed, so they can be revisited. */
+  furthest: CheckoutStepId;
+  information: CustomerInformation;
+  address: ShippingAddress;
+  deliveryOptionId: string;
+  paymentMethodId: PaymentMethodId;
+  outcome: CheckoutOutcome;
+}
+
+/** Field-keyed validation messages. Empty means the step is valid. */
+export type FieldErrors<TField extends string> = Partial<
+  Record<TField, string>
+>;
+
+export type InformationField = keyof CustomerInformation;
+export type AddressField = keyof ShippingAddress;
+
 /** Sort orders offered by the catalogue toolbar. */
 export const SORT_OPTIONS = [
   { value: "featured", label: "Featured" },

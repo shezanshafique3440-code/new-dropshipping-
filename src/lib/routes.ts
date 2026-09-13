@@ -10,6 +10,11 @@ export function productHref(slug: string): string {
   return `/shop/${slug}`;
 }
 
+/** The checkout flow. */
+export function checkoutHref(): string {
+  return "/checkout";
+}
+
 /** Catalogue filtered to one category. */
 export function categoryHref(category: string): string {
   return `/shop?category=${encodeURIComponent(category)}`;

@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
-
 import { useCart } from "@/components/cart/CartProvider";
-import { Button, ButtonLink } from "@/components/ui/Button";
+import { ButtonLink } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { siteConfig } from "@/config/site";
 import { formatPrice } from "@/lib/format";
+import { checkoutHref } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
 export interface CartSummaryProps {
@@ -31,7 +30,6 @@ export function CartSummary({
   className,
 }: CartSummaryProps) {
   const { subtotal, itemCount, closeDrawer } = useCart();
-  const [checkoutNoticeShown, setCheckoutNoticeShown] = useState(false);
 
   const threshold = siteConfig.shipping.freeThreshold;
   const remaining = Math.max(0, threshold - subtotal);
@@ -105,24 +103,19 @@ export function CartSummary({
       </dl>
 
       <div className="flex flex-col gap-2">
-        <Button
+        <ButtonLink
+          href={checkoutHref()}
           variant="gradient"
           size="lg"
           fullWidth
-          disabled={itemCount === 0}
-          onClick={() => setCheckoutNoticeShown(true)}
+          onClick={closeDrawer}
         >
           <Icon name="lock" className="size-4" />
           Proceed to Checkout
-        </Button>
+        </ButtonLink>
 
-        <p
-          aria-live="polite"
-          className="type-caption min-h-5 text-center text-foreground-subtle"
-        >
-          {checkoutNoticeShown
-            ? "Checkout is the next build step — no order was placed and no payment was taken."
-            : "Preview store — no payment is taken."}
+        <p className="type-caption text-center text-foreground-subtle">
+          Preview store — no payment is taken.
         </p>
 
         {showViewCart ? (
