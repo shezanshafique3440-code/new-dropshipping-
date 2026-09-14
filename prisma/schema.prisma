@@ -94,13 +94,19 @@ model Order {
 
   items OrderItem[]
 
-  /// Lookups a support agent or a future account page actually performs.
+  /// Lookups a support agent or the account pages actually perform.
+  ///
+  /// The composite index is the one the order-history query rides: filter by
+  /// customer, newest first, with the unique reference as a stable
+  /// tie-breaker for keyset pagination. Having `customerId` leading means it
+  /// also serves plain "orders for this customer" lookups, so no separate
+  /// single-column index is needed.
+  @@index([customerId, createdAt(sort: Desc), reference(sort: Desc)])
   @@index([customerEmail])
   @@index([status])
   @@index([paymentStatus])
   @@index([createdAt])
   @@index([updatedAt])
-  @@index([customerId])
   @@map("orders")
 }
 

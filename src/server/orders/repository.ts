@@ -41,11 +41,57 @@ export interface CreateOrderResult {
   created: boolean;
 }
 
+/**
+ * One page of a customer's order history.
+ *
+ * Keyset pagination: the cursor is the (createdAt, reference) pair of an edge
+ * row, which is stable under inserts and exposes no internal identifier —
+ * the reference is the customer's own order number.
+ */
+export interface OrderPageCursor {
+  createdAt: Date;
+  reference: string;
+}
+
+export interface OrderPageQuery {
+  /** Rows per page. The repository clamps this. */
+  limit: number;
+  cursor?: OrderPageCursor;
+  /** "older" walks back in time from the cursor; "newer" walks forward. */
+  direction?: "older" | "newer";
+}
+
+export interface OrderPage {
+  orders: readonly Order[];
+  /** True when more rows exist beyond this page in the same direction. */
+  hasMore: boolean;
+}
+
 export interface OrderRepository {
   findByCheckoutSessionId(sessionId: string): Promise<Order | null>;
 
   /** Lookup by the customer-facing reference (ZYV-XXXXXX). */
   findByReference(reference: string): Promise<Order | null>;
+
+  /**
+   * One page of orders belonging to a customer, newest first.
+   *
+   * Ownership is part of the query, not a filter applied afterwards: an order
+   * belonging to somebody else — or to nobody, as a guest order does — is
+   * never read in the first place.
+   */
+  listForCustomer(
+    customerId: string,
+    query: OrderPageQuery,
+  ): Promise<OrderPage>;
+
+  /**
+   * One order, by reference, only if this customer owns it.
+   *
+   * Returns null both for "no such order" and "not yours", so a caller has
+   * nothing to distinguish the two with.
+   */
+  findForCustomer(customerId: string, reference: string): Promise<Order | null>;
 
   /** Inserts, or returns the existing order for the same Checkout Session. */
   create(draft: NewOrder): Promise<CreateOrderResult>;

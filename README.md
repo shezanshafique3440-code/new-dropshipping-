@@ -5,15 +5,16 @@
 A premium international storefront built with Next.js (App Router), TypeScript
 and Tailwind CSS.
 
-> **Status: Step 9 — customer accounts and authentication.**
+> **Status: Step 10 — customer order history.**
 > Foundation, design system, homepage, catalogue, cart, checkout, Stripe
-> payments, durable order storage and customer sign-in are in place. Payment
-> runs through Stripe Checkout and is expected to be in **test mode**: a live
-> key is refused unless the deployment explicitly opts in (see
+> payments, durable order storage, customer sign-in and order history are in
+> place. Payment runs through Stripe Checkout and is expected to be in **test
+> mode**: a live key is refused unless the deployment explicitly opts in (see
 > [Payments](#payments-stripe)). **Guest checkout remains fully supported** —
-> an account is never required to buy. Order history, password reset, email
-> verification, admin authentication, fulfilment, tax, transactional email and
-> supplier integrations are deliberately **not** implemented yet.
+> an account is never required to buy, and guest orders never appear in
+> anybody's history. Password reset, email verification, admin authentication,
+> fulfilment and tracking, tax, transactional email and supplier integrations
+> are deliberately **not** implemented yet.
 
 ## Getting started
 
@@ -56,7 +57,8 @@ src/
 │   ├── not-found.tsx           # Custom 404
 │   ├── shop|cart|account|contact/page.tsx
 │   ├── login|register/page.tsx # Authentication
-│   ├── account/page.tsx        # Signed-in account area
+│   ├── account/page.tsx        # Signed-in account dashboard
+│   ├── account/orders/         # Order history, detail, loading, not-found
 │   ├── checkout/page.tsx       # Checkout flow
 │   ├── checkout/success/       # Stripe return: verifies before confirming
 │   └── api/
@@ -416,11 +418,62 @@ per client) and by each attempt costing an Argon2id hash. Removing it entirely
 would mean sending a "someone tried to register with your address" email, which
 needs the transactional email that does not exist yet.
 
+### Order history
+
+| Route                          | What it shows                                     |
+| ------------------------------ | -------------------------------------------------- |
+| `/account`                     | Dashboard: the three most recent orders, profile, sign out |
+| `/account/orders`              | The full history, newest first, paginated          |
+| `/account/orders/[reference]`  | One order in full, addressed by `ZYV-XXXXXX`       |
+
+**Authorization.** The customer id comes from the session cookie and goes into
+the SQL, never the other way round: `listForCustomer(customerId, …)` and
+`findForCustomer(customerId, reference)` carry ownership in the `WHERE`
+clause, so an order belonging to somebody else is never read, let alone
+filtered out afterwards. A reference that exists but belongs to another
+account produces exactly the same not-found page as one that never existed,
+and guest orders (`customerId IS NULL`) are invisible to every account —
+a matching email address grants nothing, because email is not an
+authorization mechanism.
+
+**Pagination.** Keyset, on `(createdAt DESC, reference DESC)`. The reference
+is unique, so the ordering is total and a page cannot repeat or skip a row
+when two orders share a timestamp — which offset pagination would also get
+wrong as soon as a new order arrives. The cursor is the edge row's
+`(createdAt, reference)` pair, base64url-encoded to keep it opaque; it
+contains no database id, and tampering with it changes which page is asked
+for, never whose. Ten orders per page, and one extra row is read to decide
+whether a "next" link is needed rather than running a second `COUNT`.
+
+The composite index `orders(customerId, createdAt DESC, reference DESC)` is
+exactly this query, added in the `order_history_index` migration and replacing
+the plain `customerId` index it subsumes.
+
+**What is shown.** Persisted values only. Line items are the historical
+snapshot recorded at payment — a later catalogue rename or reprice cannot
+change what an old order says was bought — while artwork and the "View
+product" link come from today's catalogue and simply disappear if the product
+is gone. Totals are the stored integers; nothing on these pages recalculates
+money. The progress timeline covers only the states the model really has
+(placed, payment, and closed/awaiting dispatch): there is no fulfilment
+integration, so no order is ever described as shipped or delivered, and no
+tracking number is invented.
+
+**Tests.**
+
+```bash
+# order history against a real database and a running server
+DATABASE_URL=... node --import ./register.mjs --test orders-db.test.mjs
+node orders-browser.mjs      # journey, ownership and pagination in a browser
+node orders-a11y.mjs         # accessibility plus 320-1920px in both themes
+```
+
 ### Not implemented in this step
 
 Password reset, email verification, "sign out everywhere" UI, two-factor
-authentication, social sign-in, admin authentication, and the order-history
-page (Step 10). The account page says so rather than showing empty widgets.
+authentication, social sign-in, admin authentication, order cancellation or
+refunds from the account, and fulfilment tracking. The pages say so rather
+than showing empty widgets.
 
 ## Payments (Stripe)
 

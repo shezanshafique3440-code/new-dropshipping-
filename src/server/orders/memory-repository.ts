@@ -6,6 +6,8 @@ import { generateOrderReference } from "./reference";
 import type {
   CreateOrderResult,
   NewOrder,
+  OrderPage,
+  OrderPageQuery,
   OrderRepository,
 } from "./repository";
 import { canTransition, FAILED_STATE, PAID_STATE } from "./transitions";
@@ -35,6 +37,23 @@ function getStore(): Store {
     processedEvents: new Set<string>(),
   };
   return globals[globalKey];
+}
+
+/** Newest first, with the unique reference breaking ties. */
+function compareNewestFirst(a: Order, b: Order): number {
+  if (a.createdAt !== b.createdAt) {
+    return a.createdAt < b.createdAt ? 1 : -1;
+  }
+  return a.reference < b.reference ? 1 : -1;
+}
+
+function isBefore(order: Order, cursor: { createdAt: Date; reference: string }): boolean {
+  const createdAt = new Date(order.createdAt).getTime();
+  const cursorAt = cursor.createdAt.getTime();
+  if (createdAt !== cursorAt) {
+    return createdAt < cursorAt;
+  }
+  return order.reference < cursor.reference;
 }
 
 function refuseInProduction(): void {
@@ -67,6 +86,45 @@ export class MemoryOrderRepository implements OrderRepository {
    * between them — so two concurrent callers (a webhook and the success page,
    * typically) cannot both decide to insert.
    */
+  /** Same ownership rule as the database adapter, in memory. */
+  async listForCustomer(
+    customerId: string,
+    query: OrderPageQuery,
+  ): Promise<OrderPage> {
+    const limit = Math.max(1, Math.trunc(query.limit));
+    const owned = [...getStore().ordersBySession.values()]
+      .filter((order) => order.customerId === customerId)
+      .sort(compareNewestFirst);
+
+    const cursor = query.cursor;
+    const walkingBack = query.direction !== "newer";
+    const matching = cursor
+      ? owned.filter((order) =>
+          walkingBack
+            ? isBefore(order, cursor)
+            : !isBefore(order, cursor) && order.reference !== cursor.reference,
+        )
+      : owned;
+
+    const window = walkingBack ? matching : matching.slice(-(limit + 1));
+    const hasMore = window.length > limit;
+    const page = walkingBack ? window.slice(0, limit) : window.slice(-limit);
+
+    return { orders: page, hasMore };
+  }
+
+  async findForCustomer(
+    customerId: string,
+    reference: string,
+  ): Promise<Order | null> {
+    for (const order of getStore().ordersBySession.values()) {
+      if (order.reference === reference && order.customerId === customerId) {
+        return order;
+      }
+    }
+    return null;
+  }
+
   async create(draft: NewOrder): Promise<CreateOrderResult> {
     refuseInProduction();
     const store = getStore();
@@ -78,6 +136,10 @@ export class MemoryOrderRepository implements OrderRepository {
     const now = new Date().toISOString();
     const order: Order = {
       ...draft,
+      // No tax engine and no promotions yet; the columns exist, the values
+      // are zero, and the repository does not invent them.
+      taxAmount: 0,
+      discountAmount: 0,
       items: [...draft.items],
       id: randomUUID(),
       reference: generateOrderReference(),

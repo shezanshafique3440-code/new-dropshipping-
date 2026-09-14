@@ -30,6 +30,26 @@ export function accountHref(): string {
   return "/account";
 }
 
+/** The customer's order history. */
+export function accountOrdersHref(page?: {
+  cursor?: string;
+  direction?: "older" | "newer";
+}): string {
+  if (!page?.cursor) {
+    return "/account/orders";
+  }
+  const params = new URLSearchParams({ cursor: page.cursor });
+  if (page.direction) {
+    params.set("direction", page.direction);
+  }
+  return `/account/orders?${params.toString()}`;
+}
+
+/** One order, addressed by its customer-facing reference. */
+export function accountOrderHref(reference: string): string {
+  return `/account/orders/${encodeURIComponent(reference)}`;
+}
+
 /**
  * Sign-in, optionally remembering where the customer was heading.
  *

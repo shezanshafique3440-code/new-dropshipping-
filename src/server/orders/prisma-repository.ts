@@ -7,6 +7,8 @@ import { generateOrderReference } from "./reference";
 import type {
   CreateOrderResult,
   NewOrder,
+  OrderPage,
+  OrderPageQuery,
   OrderRepository,
 } from "./repository";
 import { canTransition, FAILED_STATE, PAID_STATE } from "./transitions";
@@ -33,6 +35,9 @@ const UNIQUE_VIOLATION = "P2002";
 
 /** How many reference collisions to ride out before giving up. */
 const REFERENCE_ATTEMPTS = 5;
+
+/** Hard ceiling on a page of order history, whatever a caller asks for. */
+const MAX_PAGE_SIZE = 50;
 
 export class OrderStorageError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
@@ -86,6 +91,83 @@ export class PrismaOrderRepository implements OrderRepository {
     const row = await this.run("read an order", () =>
       this.prisma.order.findUnique({
         where: { stripeCheckoutSessionId: sessionId },
+        include: orderWithItems,
+      }),
+    );
+    return row ? toDomainOrder(row) : null;
+  }
+
+  /**
+   * A page of one customer's orders, newest first.
+   *
+   * The `where` clause carries the ownership condition, so PostgreSQL never
+   * returns a row belonging to anybody else and the application never has to
+   * remember to filter. Ordering is (createdAt DESC, reference DESC) — the
+   * reference is unique, so the order is total and pagination cannot repeat
+   * or skip a row when two orders share a timestamp. One row beyond the page
+   * is read to answer "is there more" without a second count query, and the
+   * items are included in the same query rather than fetched per order.
+   */
+  async listForCustomer(
+    customerId: string,
+    query: OrderPageQuery,
+  ): Promise<OrderPage> {
+    const limit = Math.min(Math.max(1, Math.trunc(query.limit)), MAX_PAGE_SIZE);
+    const walkingBack = query.direction !== "newer";
+    const cursor = query.cursor;
+
+    const keyset = cursor
+      ? walkingBack
+        ? {
+            OR: [
+              { createdAt: { lt: cursor.createdAt } },
+              {
+                createdAt: cursor.createdAt,
+                reference: { lt: cursor.reference },
+              },
+            ],
+          }
+        : {
+            OR: [
+              { createdAt: { gt: cursor.createdAt } },
+              {
+                createdAt: cursor.createdAt,
+                reference: { gt: cursor.reference },
+              },
+            ],
+          }
+      : {};
+
+    const rows = await this.run("read your orders", () =>
+      this.prisma.order.findMany({
+        where: { customerId, ...keyset },
+        include: orderWithItems,
+        orderBy: walkingBack
+          ? [{ createdAt: "desc" }, { reference: "desc" }]
+          : [{ createdAt: "asc" }, { reference: "asc" }],
+        // One extra row answers "is there another page" without a count.
+        take: limit + 1,
+      }),
+    );
+
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    // Walking forward reads ascending; the page is still presented newest first.
+    const ordered = walkingBack ? page : [...page].reverse();
+
+    return { orders: ordered.map(toDomainOrder), hasMore };
+  }
+
+  /** One order, and only if this customer owns it. */
+  async findForCustomer(
+    customerId: string,
+    reference: string,
+  ): Promise<Order | null> {
+    const row = await this.run("read your order", () =>
+      this.prisma.order.findFirst({
+        // Ownership is in the query. An order belonging to someone else, or
+        // to no one, simply does not match.
+        where: { reference, customerId },
         include: orderWithItems,
       }),
     );
@@ -358,6 +440,8 @@ function toDomainOrder(row: OrderRow): Order {
     currency: row.currency,
     subtotalAmount: row.subtotalAmount,
     shippingAmount: row.shippingAmount,
+    taxAmount: row.taxAmount,
+    discountAmount: row.discountAmount,
     totalAmount: row.totalAmount,
     customer: { email: row.customerEmail, name: row.customerName },
     customerId: row.customerId,

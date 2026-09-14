@@ -1,7 +1,13 @@
 import type { Order } from "@/types";
 
+import {
+  toCustomerOrderDetail,
+  toCustomerOrderSummary,
+  type CustomerOrderDetailView,
+  type CustomerOrderSummaryView,
+} from "./customer-dto";
 import { getOrderRepository } from "./index";
-import type { NewOrder, OrderRepository } from "./repository";
+import type { NewOrder, OrderPageCursor, OrderRepository } from "./repository";
 import {
   assertTransition,
   CANCELLED_STATE,
@@ -145,4 +151,72 @@ export async function claimWebhookEvent(
   options?: OrderServiceOptions,
 ): Promise<boolean> {
   return repo(options).claimEvent(eventId, eventType);
+}
+
+/* -------------------------------------------------------------------------
+ * Customer order history
+ *
+ * Every function here takes the customer id the caller resolved from the
+ * session — never a value from a URL, a body or a form — and passes it into
+ * the query itself. There is no code path that reads an order first and
+ * checks ownership afterwards.
+ * ---------------------------------------------------------------------- */
+
+/** Orders per page. Small enough to render fast, large enough to be useful. */
+export const ORDERS_PER_PAGE = 10;
+
+export interface CustomerOrderPage {
+  orders: readonly CustomerOrderSummaryView[];
+  /** Cursor for the next (older) page, or null at the end of the history. */
+  olderCursor: OrderPageCursor | null;
+  /** Cursor for the previous (newer) page, or null on the first page. */
+  newerCursor: OrderPageCursor | null;
+}
+
+export interface ListCustomerOrdersOptions extends OrderServiceOptions {
+  cursor?: OrderPageCursor;
+  direction?: "older" | "newer";
+  limit?: number;
+}
+
+export async function listCustomerOrders(
+  customerId: string,
+  options: ListCustomerOrdersOptions = {},
+): Promise<CustomerOrderPage> {
+  const limit = options.limit ?? ORDERS_PER_PAGE;
+  const direction = options.direction ?? "older";
+
+  const page = await repo(options).listForCustomer(customerId, {
+    limit,
+    cursor: options.cursor,
+    direction,
+  });
+
+  const orders = page.orders.map(toCustomerOrderSummary);
+  const first = page.orders[0];
+  const last = page.orders[page.orders.length - 1];
+
+  // Walking back: "more" means older orders exist. Walking forward: it means
+  // newer ones do, and there is by definition something older behind us.
+  const hasOlder = direction === "older" ? page.hasMore : Boolean(options.cursor);
+  const hasNewer = direction === "older" ? Boolean(options.cursor) : page.hasMore;
+
+  return {
+    orders,
+    olderCursor: hasOlder && last ? edge(last) : null,
+    newerCursor: hasNewer && first ? edge(first) : null,
+  };
+}
+
+export async function getCustomerOrder(
+  customerId: string,
+  reference: string,
+  options: OrderServiceOptions = {},
+): Promise<CustomerOrderDetailView | null> {
+  const order = await repo(options).findForCustomer(customerId, reference);
+  return order ? toCustomerOrderDetail(order) : null;
+}
+
+function edge(order: Order): OrderPageCursor {
+  return { createdAt: new Date(order.createdAt), reference: order.reference };
 }

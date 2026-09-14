@@ -402,6 +402,10 @@ export interface Order {
   currency: string;
   subtotalAmount: number;
   shippingAmount: number;
+  /** Always 0 today: no tax engine is connected. */
+  taxAmount: number;
+  /** Always 0 today: no promotions exist. */
+  discountAmount: number;
   totalAmount: number;
   customer: OrderCustomer;
   /**

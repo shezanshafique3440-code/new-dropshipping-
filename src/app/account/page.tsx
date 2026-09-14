@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 
 import { AccountDashboard } from "@/components/account/AccountDashboard";
+import { RecentOrders } from "@/components/account/RecentOrders";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Container } from "@/components/ui/Container";
-import { Icon } from "@/components/ui/Icon";
 import { toPublicCustomer } from "@/server/auth/dto";
 import { requireCustomer } from "@/server/auth/current-customer";
+import { listCustomerOrders } from "@/server/orders/service";
 
 export const metadata: Metadata = {
   title: "Account",
@@ -17,43 +18,41 @@ export const metadata: Metadata = {
 /** Depends on the session cookie, so it is resolved per request. */
 export const dynamic = "force-dynamic";
 
+/** How many orders the dashboard shows before pointing at the full history. */
+const RECENT_ORDERS = 3;
+
 /**
  * The account area.
  *
  * Protection is here, on the server, not in a hidden navigation link or a
  * client-side check: `requireCustomer` resolves the session cookie and
  * redirects to sign-in when there is no live session, so the page's data is
- * never assembled for someone who has not proved who they are.
+ * never assembled for someone who has not proved who they are. The orders it
+ * shows are fetched with that same customer id inside the query.
  */
 export default async function AccountPage() {
   const { customer } = await requireCustomer("/account");
   const publicCustomer = toPublicCustomer(customer);
+
+  // Scoped to this customer inside the query, and bounded: the dashboard
+  // never loads a history, only its head.
+  const recent = await listCustomerOrders(customer.id, { limit: RECENT_ORDERS });
 
   return (
     <>
       <PageHeader
         eyebrow="Your account"
         title={`Hello, ${publicCustomer.firstName}`}
-        description="Your profile and account security live here. Order history arrives in the next step."
+        description="Your orders, profile and account security, all in one place."
       />
 
-      <Container className="section-y-sm flex flex-col gap-8">
-        <AccountDashboard customer={publicCustomer} />
+      <Container className="section-y-sm flex flex-col gap-10">
+        <RecentOrders
+          orders={recent.orders}
+          hasMore={recent.olderCursor !== null}
+        />
 
-        <aside className="flex items-start gap-3 rounded-2xl border border-border-subtle bg-surface-muted p-5">
-          <Icon
-            name="bag"
-            className="mt-0.5 size-[1.15rem] shrink-0 text-foreground-subtle"
-          />
-          <div className="flex flex-col gap-1">
-            <p className="text-sm font-semibold">Orders</p>
-            <p className="type-caption text-foreground-muted">
-              Orders you place while signed in are already linked to this
-              account in our database. The page that lists them is being built —
-              until then, keep the reference shown at checkout.
-            </p>
-          </div>
-        </aside>
+        <AccountDashboard customer={publicCustomer} />
       </Container>
     </>
   );
