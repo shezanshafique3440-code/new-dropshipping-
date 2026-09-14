@@ -26,6 +26,8 @@ export interface NewOrder {
   shippingAmount: number;
   totalAmount: number;
   customer: Order["customer"];
+  /** Server-resolved account id, or null for a guest order. */
+  customerId: string | null;
   shippingAddress: Order["shippingAddress"];
   items: readonly Order["items"][number][];
   deliveryOptionId: string;

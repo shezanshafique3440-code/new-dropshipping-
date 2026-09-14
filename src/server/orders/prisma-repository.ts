@@ -111,6 +111,10 @@ export class PrismaOrderRepository implements OrderRepository {
    * unique index rejects this insert and the winner's order is returned.
    */
   async create(draft: NewOrder): Promise<CreateOrderResult> {
+    // Dropped if the payment intent turns out to be recorded against another
+    // order: the money matters, the cross-reference does not.
+    let paymentIntentId = draft.stripePaymentIntentId;
+
     for (let attempt = 0; attempt < REFERENCE_ATTEMPTS; attempt += 1) {
       const reference = generateOrderReference();
 
@@ -128,6 +132,7 @@ export class PrismaOrderRepository implements OrderRepository {
                 totalAmount: draft.totalAmount,
                 customerEmail: draft.customer.email,
                 customerName: draft.customer.name,
+                customerId: draft.customerId,
                 shippingName: draft.shippingAddress?.name ?? null,
                 shippingLine1: draft.shippingAddress?.line1 ?? null,
                 shippingLine2: draft.shippingAddress?.line2 ?? null,
@@ -137,7 +142,7 @@ export class PrismaOrderRepository implements OrderRepository {
                 shippingCountry: draft.shippingAddress?.country ?? null,
                 deliveryOptionId: draft.deliveryOptionId,
                 stripeCheckoutSessionId: draft.stripeCheckoutSessionId,
-                stripePaymentIntentId: draft.stripePaymentIntentId,
+                stripePaymentIntentId: paymentIntentId,
                 items: {
                   create: draft.items.map((item) => ({
                     productId: item.productId,
@@ -171,6 +176,19 @@ export class PrismaOrderRepository implements OrderRepository {
 
         if (isUniqueViolation(error, "reference")) {
           // Two references collided. Vanishingly rare; simply mint another.
+          continue;
+        }
+
+        if (paymentIntentId && isUniqueViolation(error, "stripePaymentIntentId")) {
+          // Another order already carries this payment intent. Recording the
+          // order without the cross-reference is far better than refusing to
+          // record a payment that has already happened; the mismatch is
+          // logged so it can be reconciled.
+          console.warn(
+            `[orders] Payment intent already recorded against another order; ` +
+              `storing this order without it.`,
+          );
+          paymentIntentId = null;
           continue;
         }
 
@@ -342,6 +360,7 @@ function toDomainOrder(row: OrderRow): Order {
     shippingAmount: row.shippingAmount,
     totalAmount: row.totalAmount,
     customer: { email: row.customerEmail, name: row.customerName },
+    customerId: row.customerId,
     shippingAddress: toDomainAddress(row),
     items: row.items.map(toDomainItem),
     deliveryOptionId: row.deliveryOptionId,

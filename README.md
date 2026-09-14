@@ -5,14 +5,15 @@
 A premium international storefront built with Next.js (App Router), TypeScript
 and Tailwind CSS.
 
-> **Status: Step 8 — persistent orders (PostgreSQL + Prisma).**
+> **Status: Step 9 — customer accounts and authentication.**
 > Foundation, design system, homepage, catalogue, cart, checkout, Stripe
-> payments and durable order storage are in place. Payment runs through Stripe
-> Checkout and is expected to be in **test mode**: a live key is refused unless
-> the deployment explicitly opts in (see [Payments](#payments-stripe)).
-> Fulfilment, tax, transactional email, customer accounts and order history,
-> admin tooling and supplier integrations are deliberately **not** implemented
-> yet — each lands in its own step.
+> payments, durable order storage and customer sign-in are in place. Payment
+> runs through Stripe Checkout and is expected to be in **test mode**: a live
+> key is refused unless the deployment explicitly opts in (see
+> [Payments](#payments-stripe)). **Guest checkout remains fully supported** —
+> an account is never required to buy. Order history, password reset, email
+> verification, admin authentication, fulfilment, tax, transactional email and
+> supplier integrations are deliberately **not** implemented yet.
 
 ## Getting started
 
@@ -54,9 +55,13 @@ src/
 │   ├── global-error.tsx        # Root layout error boundary
 │   ├── not-found.tsx           # Custom 404
 │   ├── shop|cart|account|contact/page.tsx
+│   ├── login|register/page.tsx # Authentication
+│   ├── account/page.tsx        # Signed-in account area
 │   ├── checkout/page.tsx       # Checkout flow
 │   ├── checkout/success/       # Stripe return: verifies before confirming
 │   └── api/
+│       ├── auth/register|login|logout/route.ts
+│       ├── account/profile/route.ts
 │       ├── checkout/create-session/route.ts
 │       ├── checkout/session-status/route.ts
 │       └── webhooks/stripe/route.ts
@@ -85,7 +90,9 @@ src/
 ├── hooks/useLockBodyScroll.ts
 ├── lib/                        # env, format, money, cart, checkout, catalog, routes
 ├── server/                     # server-only: never imported by a client component
+│   ├── auth/                   # passwords, sessions, customers, authorization
 │   ├── db/                     # Prisma client singleton + connection config
+│   ├── http/                   # same-origin (CSRF) checks
 │   ├── orders/                 # order domain: repository, adapters, transitions, service
 │   ├── payments/               # Stripe client, config, validation, session, orders
 │   └── rate-limit.ts
@@ -197,6 +204,8 @@ the public order reference).
 | Model                   | What it holds                                                    |
 | ----------------------- | ---------------------------------------------------------------- |
 | `Order`                 | One paid-for basket: reference, statuses, amounts, customer, address, Stripe ids, timestamps |
+| `Customer`              | A registered shopper: normalized email, name, Argon2id hash        |
+| `CustomerSession`       | A signed-in session: token digest, deadlines, revocation           |
 | `OrderItem`             | An immutable snapshot of one purchased line                       |
 | `ProcessedWebhookEvent` | Stripe event ids already handled, so a retry cannot be processed twice |
 
@@ -276,6 +285,142 @@ balancer behave the same as one.
 - Refunds are modelled (`refunded`) but nothing issues one yet.
 - Shipping is charged at zero, tax is not calculated, and no order email is
   sent. See the Stripe section below.
+
+## Accounts and authentication
+
+Customers can register, sign in, see their account, change their name and sign
+out. Sessions live in PostgreSQL and are addressed by an HttpOnly cookie.
+
+### Architecture
+
+No authentication library is used. The requirement — email and password, with
+sessions that can be revoked server-side — is served by roughly 400 lines of
+explicit code, where every rule is visible and auditable, rather than by a
+framework whose credentials flow would default to a JWT this project has no
+use for.
+
+```
+browser cookie (256-bit random token)
+  → customer_sessions row (SHA-256 of the token)
+    → customers row
+```
+
+That resolution runs in `getCurrentCustomer()` and nowhere else. A customer id
+in a request body, a query string or a hidden field is never accepted as
+identity — the profile endpoint, for instance, has no way to address an
+account other than the one the cookie resolves to.
+
+| Route                        | What it does                                    |
+| ---------------------------- | ----------------------------------------------- |
+| `/register`                  | Create an account, signed in immediately         |
+| `/login`                     | Sign in; supports `?next=` (validated)           |
+| `/account`                   | Profile, security details, sign out              |
+| `POST /api/auth/register`    | Validate, hash, insert, open a session           |
+| `POST /api/auth/login`       | Verify and open a session                        |
+| `POST /api/auth/logout`      | Revoke the session, clear the cookie             |
+| `PATCH /api/account/profile` | Update first and last name                       |
+
+### Customer model
+
+`Customer` holds the email as typed (for display) and `emailNormalized` —
+trimmed and lowercased — which is the unique identity, so `Amelia@Example.com`
+and `amelia@example.com` can never become two accounts. It also holds the
+password hash, first and last name, `emailVerifiedAt` and `lastLoginAt`
+(the first is reserved for a verification step that does not exist yet), and
+timestamps.
+
+### Password hashing
+
+**Argon2id**, via `@node-rs/argon2` (prebuilt binaries, so no compiler is
+needed on the host), at the OWASP minimum of 19 MiB memory, 2 iterations and
+1 lane. It was preferred over bcrypt because it is memory-hard: an attacker
+with GPUs gains much less against it. Hashes are salted per password by the
+library, and the plaintext exists only for the length of the request that
+carries it — never logged, echoed, stored or returned.
+
+A sign-in attempt for an address that does not exist still computes a
+throwaway hash, so the timing does not reveal which addresses are registered.
+
+### Session model
+
+| Property   | Value                                                             |
+| ---------- | ----------------------------------------------------------------- |
+| Token      | 32 random bytes from `crypto.randomBytes`, base64url               |
+| Stored as  | SHA-256 digest — the raw token exists only in the browser cookie   |
+| Absolute   | 30 days from creation                                              |
+| Idle       | 7 days since last use (`lastUsedAt`, written at most hourly)       |
+| Revocation | `revokedAt` timestamp; sign-out sets it, resolution rejects it     |
+
+A plain SHA-256 is right for the digest: the input is already 256 bits of
+randomness, so there is nothing to brute-force and no need for a slow KDF.
+Revoking is a column update rather than a delete, which leaves room for
+"sign out everywhere", password-change invalidation and session auditing —
+`revokeAllSessionsForCustomer()` is already there for the first of those.
+
+### Cookie security
+
+`zyvero_session`, `HttpOnly`, `SameSite=Lax`, `Path=/`, no `Domain`, and
+`Secure` whenever `NODE_ENV=production` (so localhost still works over HTTP in
+development). `Lax` rather than `Strict` because the cookie has to survive the
+top-level return from Stripe's hosted checkout. The token is never in
+`localStorage`, `sessionStorage`, a URL or React state.
+
+### CSRF
+
+Two layers, because `HttpOnly` does nothing for CSRF — it stops a script
+reading the cookie, not a browser attaching it:
+
+1. `SameSite=Lax` keeps the cookie off cross-site POSTs.
+2. Every state-changing auth endpoint independently verifies `Origin` (falling
+   back to `Referer`) against this deployment's origins, and refuses a request
+   that carries neither. See `src/server/http/same-origin.ts`.
+
+### Authorization
+
+`/account` is protected on the server by `requireCustomer()`, which resolves
+the session and redirects to `/login?next=…` when there is none. A middleware
+matcher on `/account` turns "no cookie at all" into a clean HTTP redirect, but
+it only checks that a cookie exists: it is an optimisation, and deleting it
+would cost polish, not security.
+
+`?next=` is validated by `safeNextPath()` — only a single-slash-rooted path on
+this site survives; absolute URLs, `//host`, `javascript:`, backslashes,
+control characters and over-long values all fall back to `/account`.
+
+### Rate limiting
+
+Registration 8/hour, sign-in 10 per 15 minutes, profile updates 20 per 15
+minutes, sign-out 30/minute — per client, per endpoint. **This counter is in
+each instance's memory**, exactly as it has been since Step 7: it is not
+distributed, several instances each hold their own count, and a shared store
+(Redis) has not been added. The seam is `checkRateLimit`, so replacing it
+touches one file.
+
+### Orders and accounts
+
+`Order.customerId` is now a real foreign key to `Customer`, nullable and
+`ON DELETE SET NULL`. When a signed-in customer starts checkout, the server
+reads their id from the session cookie and puts it in the Stripe session's
+metadata, so the webhook can link the resulting order to the account without
+the browser ever asserting who it is. Guest orders keep a null `customerId`
+for ever — ownership of an old guest order is never guessed from a matching
+email address.
+
+### Known trade-off: registration and email enumeration
+
+Sign-in never says whether an address is registered. Registration does: it
+answers "an account already exists for that email address", because the person
+in front of the form needs to know, and they could confirm it anyway by trying
+to sign in. The exposure is bounded by the rate limit (8 registrations per hour
+per client) and by each attempt costing an Argon2id hash. Removing it entirely
+would mean sending a "someone tried to register with your address" email, which
+needs the transactional email that does not exist yet.
+
+### Not implemented in this step
+
+Password reset, email verification, "sign out everywhere" UI, two-factor
+authentication, social sign-in, admin authentication, and the order-history
+page (Step 10). The account page says so rather than showing empty widgets.
 
 ## Payments (Stripe)
 

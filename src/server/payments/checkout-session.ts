@@ -29,6 +29,13 @@ export interface CreatedSession {
 export async function createCheckoutSession(
   stripe: Stripe,
   request: TrustedCheckoutRequest,
+  /**
+   * The signed-in account, resolved from the session cookie by the caller.
+   * It travels to Stripe as metadata and comes back on the webhook, so the
+   * order can be linked to the account without the browser ever being asked
+   * who it is.
+   */
+  customerId: string | null = null,
 ): Promise<CreatedSession> {
   const origin = getPaymentReturnOrigin();
   const delivery = findDeliveryOption(request.deliveryOptionId);
@@ -80,6 +87,7 @@ export async function createCheckoutSession(
       shippingRegion: request.address.region,
       shippingPostalCode: request.address.postalCode,
       shippingCountry: request.address.country,
+      ...(customerId ? { customerId } : {}),
     },
     success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/checkout?payment=cancelled`,

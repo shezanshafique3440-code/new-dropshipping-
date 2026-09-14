@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, type ReactNode, type SelectHTMLAttributes } from "react";
+import { useId, useState, type ReactNode, type SelectHTMLAttributes } from "react";
 import type { InputHTMLAttributes } from "react";
 
 import { cn } from "@/lib/utils";
@@ -157,6 +157,63 @@ export function TextField({
               : "border-border hover:border-border-strong focus-visible:border-brand-primary",
           )}
         />
+      )}
+    </FieldShell>
+  );
+}
+
+export interface PasswordFieldProps
+  extends Omit<InputHTMLAttributes<HTMLInputElement>, "id" | "className" | "type"> {
+  label: string;
+  hint?: string;
+  error?: string;
+  className?: string;
+}
+
+/**
+ * Password input with an accessible show/hide control.
+ *
+ * The toggle is a real button with its own label, so a screen reader
+ * announces what it does and its state; focus stays where it was, so
+ * revealing the password mid-typing does not lose the caret. The value is
+ * only ever in the input — nothing here logs or copies it.
+ */
+export function PasswordField({
+  label,
+  hint,
+  error,
+  className,
+  ...props
+}: PasswordFieldProps) {
+  const id = useId();
+  const [revealed, setRevealed] = useState(false);
+
+  return (
+    <FieldShell id={id} label={label} hint={hint} error={error} className={className}>
+      {(aria) => (
+        <div className="relative">
+          <input
+            {...aria}
+            {...props}
+            type={revealed ? "text" : "password"}
+            className={cn(
+              controlStyles,
+              "h-12 pr-24 sm:h-11",
+              error
+                ? "border-danger focus-visible:border-danger"
+                : "border-border hover:border-border-strong focus-visible:border-brand-primary",
+            )}
+          />
+          <button
+            type="button"
+            onClick={() => setRevealed((current) => !current)}
+            aria-pressed={revealed}
+            aria-label={revealed ? "Hide password" : "Show password"}
+            className="absolute inset-y-1.5 right-1.5 inline-flex items-center rounded-full px-3.5 text-xs font-semibold text-foreground-muted transition-colors duration-200 hover:bg-surface-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+          >
+            {revealed ? "Hide" : "Show"}
+          </button>
+        </div>
       )}
     </FieldShell>
   );

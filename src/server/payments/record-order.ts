@@ -114,6 +114,7 @@ function buildDraft(session: Stripe.Checkout.Session, paid: boolean): NewOrder {
       email: session.customer_details?.email ?? session.customer_email ?? "",
       name: session.customer_details?.name ?? session.metadata?.customerName ?? "",
     },
+    customerId: readCustomerId(session),
     shippingAddress: readShippingAddress(session),
     items,
     deliveryOptionId: session.metadata?.deliveryOptionId ?? "",
@@ -121,6 +122,21 @@ function buildDraft(session: Stripe.Checkout.Session, paid: boolean): NewOrder {
     stripePaymentIntentId: readPaymentIntentId(session),
   };
 }
+
+/**
+ * The account this order belongs to, if any.
+ *
+ * Written into the session's metadata by our own server at checkout, so it is
+ * as trustworthy as the session that produced it. Shape-checked anyway before
+ * it becomes a foreign key.
+ */
+function readCustomerId(session: Stripe.Checkout.Session): string | null {
+  const value = session.metadata?.customerId;
+  return typeof value === "string" && UUID_PATTERN.test(value) ? value : null;
+}
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-9a-f][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function readPaymentIntentId(session: Stripe.Checkout.Session): string | null {
   const intent = session.payment_intent;

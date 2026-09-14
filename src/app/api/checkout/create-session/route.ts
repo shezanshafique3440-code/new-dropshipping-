@@ -6,6 +6,7 @@ import {
   parseCheckoutRequest,
   type RequestRejection,
 } from "@/server/payments/checkout-request";
+import { getCurrentCustomer } from "@/server/auth/current-customer";
 import { getStripeClient } from "@/server/payments/stripe";
 import { checkRateLimit, clientKey } from "@/server/rate-limit";
 
@@ -83,7 +84,14 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const session = await createCheckoutSession(getStripeClient(), parsed.value);
+    // Guest checkout stays first-class: this is null unless a real session
+    // cookie resolves to an account, and the browser has no say in it.
+    const account = await getCurrentCustomer().catch(() => null);
+    const session = await createCheckoutSession(
+      getStripeClient(),
+      parsed.value,
+      account?.customer.id ?? null,
+    );
     return NextResponse.json(
       { url: session.url },
       { headers: { "cache-control": "no-store" } },

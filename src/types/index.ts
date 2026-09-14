@@ -404,6 +404,12 @@ export interface Order {
   shippingAmount: number;
   totalAmount: number;
   customer: OrderCustomer;
+  /**
+   * The account that placed the order, when one was signed in. Resolved from
+   * the server-side session at checkout — never from anything the browser
+   * sent — and null for guest orders, which stay guest orders for ever.
+   */
+  customerId: string | null;
   shippingAddress: OrderShippingAddress | null;
   items: readonly OrderItem[];
   deliveryOptionId: string;

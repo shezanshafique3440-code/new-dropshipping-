@@ -25,6 +25,25 @@ export function checkoutSuccessHref(): string {
   return "/checkout/success";
 }
 
+/** The customer account area. */
+export function accountHref(): string {
+  return "/account";
+}
+
+/**
+ * Sign-in, optionally remembering where the customer was heading.
+ *
+ * The `next` value is validated again when it is used, so a crafted link
+ * cannot turn this into an open redirect.
+ */
+export function loginHref(next?: string): string {
+  return next ? `/login?next=${encodeURIComponent(next)}` : "/login";
+}
+
+export function registerHref(next?: string): string {
+  return next ? `/register?next=${encodeURIComponent(next)}` : "/register";
+}
+
 /** Catalogue filtered to one category. */
 export function categoryHref(category: string): string {
   return `/shop?category=${encodeURIComponent(category)}`;

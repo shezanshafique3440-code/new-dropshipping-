@@ -65,9 +65,12 @@ model Order {
 
   customerEmail String  @db.VarChar(254)
   customerName  String  @db.VarChar(200)
-  /// Reserved for the authenticated-account step: nothing sets this yet, and
-  /// order ownership is by email until real accounts exist.
-  customerId    String? @db.Uuid
+  /// Set when the order was placed by a signed-in customer, resolved from the
+  /// server-side session — never from anything the browser sent. Guest orders
+  /// leave it null, and always will: ownership is never guessed after the
+  /// fact from a matching email address.
+  customerId    String?   @db.Uuid
+  customer      Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
   shippingName       String? @db.VarChar(200)
   shippingLine1      String? @db.VarChar(200)
@@ -99,6 +102,68 @@ model Order {
   @@index([updatedAt])
   @@index([customerId])
   @@map("orders")
+}
+
+/// A registered shopper.
+///
+/// Identity is the *normalized* email: trimmed and lowercased, and unique.
+/// The email as typed is kept separately so "Amelia@Example.com" can still be
+/// shown back the way she wrote it while never becoming a second account.
+model Customer {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// As the customer typed it, for display only.
+  email           String @db.VarChar(254)
+  /// Trimmed and lowercased. The identity, and the unique key.
+  emailNormalized String @unique @db.VarChar(254)
+
+  firstName String @db.VarChar(80)
+  lastName  String @db.VarChar(80)
+
+  /// Argon2id PHC string. Never leaves the server, never enters a response.
+  passwordHash String @db.VarChar(255)
+
+  /// Email verification is not implemented yet; the column exists so adding
+  /// it later does not migrate live customer rows.
+  emailVerifiedAt DateTime? @db.Timestamptz(3)
+  lastLoginAt     DateTime? @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  sessions CustomerSession[]
+  orders   Order[]
+
+  @@index([createdAt])
+  @@map("customers")
+}
+
+/// A signed-in session.
+///
+/// The browser holds a 256-bit random token in an HttpOnly cookie; the
+/// database holds only its SHA-256 digest, so a leaked database dump cannot
+/// be replayed as a login. Sessions expire on both an absolute and an idle
+/// deadline, and revoking one is a column update rather than a delete, which
+/// keeps "logout all devices" and audit trails available later.
+model CustomerSession {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// SHA-256 of the cookie token, hex. The raw token is never stored.
+  tokenHash String @unique @db.VarChar(64)
+
+  customerId String   @db.Uuid
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  /// Absolute deadline: the session dies at this point however active it is.
+  expiresAt  DateTime  @db.Timestamptz(3)
+  /// Moved forward as the session is used, for the idle deadline.
+  lastUsedAt DateTime  @default(now()) @db.Timestamptz(3)
+  revokedAt  DateTime? @db.Timestamptz(3)
+
+  @@index([customerId])
+  @@index([expiresAt])
+  @@map("customer_sessions")
 }
 
 /// An immutable snapshot of one purchased line.
