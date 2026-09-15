@@ -3,7 +3,7 @@
 import Link from "next/link";
 
 import { useCart } from "@/components/cart/CartProvider";
-import { ProductArtwork } from "@/components/product/ProductArtwork";
+import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { QuantityStepper } from "@/components/product/QuantityStepper";
 import { Icon } from "@/components/ui/Icon";
 import { getCartLineTotal } from "@/lib/cart";
@@ -48,7 +48,14 @@ export function CartLine({ item, variant = "compact", onRemoved }: CartLineProps
           full ? "w-24 sm:w-28" : "w-20",
         )}
       >
-        <ProductArtwork art={item.art} tone={item.tone} ratio="square" />
+        {/* Decorative: the line's heading names the product just beside it. */}
+        <ProductThumbnail
+          image={item.image}
+          art={item.art}
+          tone={item.tone}
+          decorative
+          zoom
+        />
       </Link>
 
       <div className="flex min-w-0 flex-1 flex-col gap-2">

@@ -36,6 +36,19 @@ export const SUPPORTED_CURRENCIES = ["usd"] as const;
 
 const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
+/**
+ * True for something that could be a product slug.
+ *
+ * Used by lookups as well as by the form. A path segment arrives from the URL
+ * already decoded, so it can hold anything a client cares to percent-encode —
+ * a NUL byte included, which PostgreSQL rejects outright. Checking the shape
+ * first turns that into an ordinary "no such product" instead of a query the
+ * driver refuses to send.
+ */
+export function isProductSlug(value: string): boolean {
+  return value.length > 0 && value.length <= MAX_SLUG_LENGTH && SLUG_PATTERN.test(value);
+}
+
 export type ProductField =
   | "name"
   | "slug"

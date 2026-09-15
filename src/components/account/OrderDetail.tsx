@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { OrderStatusBadges } from "@/components/account/OrderStatusBadges";
 import { OrderTimeline } from "@/components/account/OrderTimeline";
-import { ProductArtwork } from "@/components/product/ProductArtwork";
+import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { ButtonLink } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { findCountry } from "@/data/countries";
@@ -214,16 +214,13 @@ function OrderItemRow({ item }: { item: CustomerOrderItemView }) {
   return (
     <li className="flex items-start gap-4">
       <span className="w-16 shrink-0 overflow-hidden rounded-xl border border-border-subtle">
-        {item.art && item.tone ? (
-          <ProductArtwork art={item.art} tone={item.tone} ratio="square" zoom={false} />
-        ) : (
-          <span
-            aria-hidden="true"
-            className="grid aspect-square place-items-center bg-surface-muted text-foreground-subtle"
-          >
-            <Icon name="bag" className="size-5" />
-          </span>
-        )}
+        {/* Decorative: the line's name is read out immediately after it. */}
+        <ProductThumbnail
+          image={item.image}
+          art={item.art}
+          tone={item.tone}
+          decorative
+        />
       </span>
 
       <span className="flex min-w-0 flex-1 flex-col gap-1">

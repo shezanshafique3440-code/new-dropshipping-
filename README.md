@@ -671,10 +671,10 @@ administrators saving at the same moment produce one write and one conflict.
 
 ### Artwork
 
-Products are drawn with the built-in illustration set. The database stores a
-key (`artKey`) and a tone, not an image — the visual identity is referenced,
-never embedded — so nothing here depends on an image pipeline that does not
-exist yet. Real photography arrives with the supplier integration.
+Every product also carries a built-in illustration key (`artKey`) and a tone.
+Since the media system landed this is the *fallback* rather than the picture:
+a product with no images renders the illustration panel, which is visibly an
+illustration. See **Product media** below.
 
 ### Tests
 
@@ -697,9 +697,145 @@ node catalog-a11y.mjs
 
 ### Not implemented in this step
 
-Product variants, inventory, supplier feeds, CSV or automated imports, image
-upload, product reviews, wishlists, coupons, bulk editing, and a delete
-control. The panel says so where an operator might look for one.
+Product variants, inventory, supplier feeds, CSV or automated imports,
+product reviews, wishlists, coupons, bulk editing, and a delete control. The
+panel says so where an operator might look for one.
+
+## Product media
+
+### What the images are
+
+Every product ships four images, and they are **generated renders, not
+photographs**. `scripts/media/scenes.mjs` draws each product as an original
+vector scene; `scripts/generate-product-media.mjs` rasterises it through
+Chromium and writes WebP into `public/products/<slug>/`. Every pixel is this
+repository's own, so there is no licence to honour, no watermark, no
+third-party branding and no hotlink to somebody else's server.
+
+The storefront says so, in visible copy under each gallery, from
+`siteConfig.media.disclosure`. Nothing describes a render as a photograph —
+including the alt text, which says what is *visible* rather than how it was
+made. When real photography replaces these, that sentence is the thing to
+change, deliberately.
+
+```bash
+npm run media:generate     # redraw every product (needs playwright-core)
+npm run media:check        # re-render and compare; writes nothing
+npm run db:seed:media      # attach the rendered files to their products
+npm run db:seed:media -- --prune   # also detach rows whose file has gone
+```
+
+The generator is deterministic: the same product and view always produce the
+same bytes, which is what `media:check` verifies and what keeps the committed
+files from churning. It is not a dependency of the running application —
+`playwright-core` is not in `package.json`; point `PLAYWRIGHT_CORE` at an
+install to run it.
+
+The seed is idempotent. Rows are keyed on `(productId, storageKey)`, so the
+second and third runs update the same rows instead of creating more, and an
+administrator's reordering survives a re-seed because positions are only
+assigned when a row is first created.
+
+### Storage
+
+An image row stores a **storage key** — `products/<slug>/front.webp` — and
+never a URL or a filesystem path. A driver turns the key into a public URL:
+
+| `MEDIA_STORAGE_DRIVER` | What it does | Writable |
+| --- | --- | --- |
+| `public-directory` (default) | Serves `public/products` from this origin | Only with `MEDIA_UPLOADS_ENABLED=true` |
+| `cdn` | Builds URLs under `MEDIA_PUBLIC_BASE_URL` | No — it has no bucket credentials |
+
+Moving the catalogue's media to S3, R2 or a CDN is therefore a configuration
+change and a third class implementing `ProductMediaStorage`: no migration, no
+change to a row, no change to a component.
+
+`MEDIA_PUBLIC_BASE_URL` must be a plain https base URL with no credentials,
+query or fragment — it ends up in every rendered `<img src>`, so anything
+secret in it would be published. `next.config.ts` reads the same value and
+allows exactly that host, over https, under `<base>/products/**`. There is no
+wildcard host, no `**` pathname and no `dangerouslyAllowSVG`: `next/image`
+proxies whatever it is pointed at, so an allow-all there would turn this
+origin into an open image proxy for the whole internet.
+
+### Uploads
+
+The panel offers an upload form only where the driver can genuinely store the
+bytes. Where it cannot — the default — it says so and explains that images are
+published by committing them and re-running the seed. A form that cannot work
+is a lie told with a button.
+
+Where uploads are on, the bytes are the only thing trusted about them. The
+format and the dimensions are parsed out of the file's own header
+(`src/server/media/image-metadata.ts`), never taken from the filename or the
+declared content type, and only WebP, AVIF, PNG and JPEG are recognised — SVG
+very much included in what is not, because an SVG the optimiser serves back is
+a script running on this origin. The storage key is *constructed* from the
+product's slug and a hash of the bytes, so a caller cannot choose where an
+object lands or what it is called.
+
+### Invariants
+
+Two things the application is not the only thing enforcing:
+
+- **Exactly one primary image per product**, held by a partial unique index
+  (`product_images_one_primary`). Promoting a new primary is a demote-then-
+  promote inside one transaction, so there is never an instant with two.
+- **A row describes real bytes**: CHECK constraints reject an absolute or
+  traversing storage key, empty or untrimmed alt text, a zero or absurd
+  dimension, a negative position and an unknown format.
+
+Positions are kept as a dense `0..n-1` run. Reordering sends the whole list
+and is refused as stale if the gallery has moved underneath it. Removing the
+primary promotes the next image; the last image cannot be removed, because a
+product with an empty gallery should be a decision rather than one click too
+many.
+
+### Orders are not affected
+
+`order_items` has **no** foreign key into `product_images`, and a test asserts
+that it never gains one. A receipt is a snapshot of what was bought: an order
+line keeps its own name, slug and amounts, and the thumbnail beside it is
+looked up from the catalogue live. Reorder a gallery, replace a primary image
+or delete every image, and the order's record does not change — it falls back
+to the illustration panel, then to a neutral placeholder if the product itself
+is gone.
+
+### Fallbacks
+
+    a real image → another image in the gallery → the illustration panel → a bag icon
+
+The last step is for an order line whose product was deleted years ago. No
+step renders an `<img>` whose source might not resolve, and every image
+declares its intrinsic size so nothing shifts as the page loads.
+
+### Tests
+
+```bash
+# keys, header sniffing, fallback order, stored cart thumbnails
+node --import ./register.mjs --test media-unit.test.mjs
+
+# the repository, the invariants and the CHECK constraints
+DATABASE_URL=... node --import ./register.mjs --test media-db.test.mjs
+
+# the endpoints over HTTP, including the thirteen security cases
+node --test media-http.test.mjs
+
+# the gallery does not rewrite history
+DATABASE_URL=... node --import ./register.mjs --test media-order-regression.test.mjs
+
+# gallery, swipe, keyboard, lightbox and the panel, in a browser
+node media-browser.mjs
+
+# accessibility, and 320-1920px in both themes
+node media-a11y.mjs
+```
+
+### Not implemented in this step
+
+Cropping, focal points, art direction per breakpoint, variant-specific
+imagery, video, a bucket-backed write driver, background removal, and
+automatic alt-text generation.
 
 ## Operations panel (admin)
 

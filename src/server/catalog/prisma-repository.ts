@@ -8,10 +8,16 @@ import type {
   ProductArtKey,
   ProductBadgeTone,
   ProductCategory,
+  ProductMedia,
   ProductTag,
 } from "@/types";
 
 import { getPrismaClient } from "../db/client";
+import { GALLERY_ORDER } from "../media/prisma-repository";
+import {
+  getProductMediaStorage,
+  type ProductMediaStorage,
+} from "../media/storage";
 import type {
   AdminProductPage,
   AdminProductQuery,
@@ -58,7 +64,20 @@ export function isSlugTakenError(error: unknown): boolean {
   );
 }
 
-type ProductRow = Prisma.ProductGetPayload<object>;
+/**
+ * Every read joins the gallery.
+ *
+ * Not an afterthought and not a second call: a product without its images is
+ * a product that cannot be rendered, so the images come back with it. A shop
+ * page listing thirty-two products costs one query, not thirty-three — there
+ * is no code path here that can turn into an N+1, because there is no code
+ * path that fetches a gallery on its own.
+ */
+const WITH_IMAGES = {
+  images: { orderBy: GALLERY_ORDER },
+} satisfies Prisma.ProductInclude;
+
+type ProductRow = Prisma.ProductGetPayload<{ include: typeof WITH_IMAGES }>;
 
 /** Published, in the order the catalogue presents them. */
 const PUBLISHED = { status: "published" } as const;
@@ -70,24 +89,39 @@ const CATALOGUE_ORDER: Prisma.ProductOrderByWithRelationInput[] = [
 export class PrismaCatalogRepository implements CatalogRepository {
   private readonly prisma: PrismaClient;
 
-  constructor(prisma: PrismaClient = getPrismaClient()) {
+  /**
+   * Injected rather than imported at the point of use, so a test can render a
+   * catalogue against a fake bucket and so the choice of driver is made once,
+   * in configuration, rather than implied by whatever module happened to run.
+   */
+  private readonly media: ProductMediaStorage;
+
+  constructor(
+    prisma: PrismaClient = getPrismaClient(),
+    media: ProductMediaStorage = getProductMediaStorage(),
+  ) {
     this.prisma = prisma;
+    this.media = media;
   }
 
   /* ---------------------------------------------------------- storefront */
 
   async listPublished(): Promise<readonly Product[]> {
     const rows = await this.run("read the catalogue", () =>
-      this.prisma.product.findMany({ where: PUBLISHED, orderBy: CATALOGUE_ORDER }),
+      this.prisma.product.findMany({
+        where: PUBLISHED,
+        orderBy: CATALOGUE_ORDER,
+        include: WITH_IMAGES,
+      }),
     );
-    return rows.map(toDomainProduct);
+    return rows.map((row) => toDomainProduct(row, this.media));
   }
 
   async findPublishedBySlug(slug: string): Promise<Product | null> {
     const row = await this.run("read a product", () =>
-      this.prisma.product.findFirst({ where: { slug, ...PUBLISHED } }),
+      this.prisma.product.findFirst({ where: { slug, ...PUBLISHED }, include: WITH_IMAGES }),
     );
-    return row ? toDomainProduct(row) : null;
+    return row ? toDomainProduct(row, this.media) : null;
   }
 
   async findPublishedByIds(
@@ -109,9 +143,12 @@ export class PrismaCatalogRepository implements CatalogRepository {
       return new Map();
     }
     const rows = await this.run("read products", () =>
-      this.prisma.product.findMany({ where: { id: { in: unique }, ...scope } }),
+      this.prisma.product.findMany({
+        where: { id: { in: unique }, ...scope },
+        include: WITH_IMAGES,
+      }),
     );
-    return new Map(rows.map((row) => [row.id, toDomainProduct(row)]));
+    return new Map(rows.map((row) => [row.id, toDomainProduct(row, this.media)]));
   }
 
   async listFeatured(limit: number): Promise<readonly Product[]> {
@@ -120,9 +157,10 @@ export class PrismaCatalogRepository implements CatalogRepository {
         where: { ...PUBLISHED, featured: true },
         orderBy: CATALOGUE_ORDER,
         take: bounded(limit),
+        include: WITH_IMAGES,
       }),
     );
-    return rows.map(toDomainProduct);
+    return rows.map((row) => toDomainProduct(row, this.media));
   }
 
   async listBestsellers(
@@ -138,9 +176,10 @@ export class PrismaCatalogRepository implements CatalogRepository {
         },
         orderBy: CATALOGUE_ORDER,
         take: bounded(limit),
+        include: WITH_IMAGES,
       }),
     );
-    return rows.map(toDomainProduct);
+    return rows.map((row) => toDomainProduct(row, this.media));
   }
 
   /**
@@ -204,19 +243,20 @@ export class PrismaCatalogRepository implements CatalogRepository {
           orderBy: [{ updatedAt: "desc" }, { slug: "asc" }],
           take,
           skip,
+          include: WITH_IMAGES,
         }),
         this.prisma.product.count({ where }),
       ]),
     );
 
-    return { products: rows.map(toAdminRecord), total };
+    return { products: rows.map((row) => toAdminRecord(row, this.media)), total };
   }
 
   async findForAdmin(slug: string): Promise<AdminProductRecord | null> {
     const row = await this.run("read the product", () =>
-      this.prisma.product.findUnique({ where: { slug } }),
+      this.prisma.product.findUnique({ where: { slug }, include: WITH_IMAGES }),
     );
-    return row ? toAdminRecord(row) : null;
+    return row ? toAdminRecord(row, this.media) : null;
   }
 
   async isSlugTaken(slug: string): Promise<boolean> {
@@ -231,9 +271,9 @@ export class PrismaCatalogRepository implements CatalogRepository {
 
   async create(draft: NewProduct): Promise<AdminProductRecord> {
     const row = await this.run("create the product", () =>
-      this.prisma.product.create({ data: toRow(draft) }),
+      this.prisma.product.create({ data: toRow(draft), include: WITH_IMAGES }),
     );
-    return toAdminRecord(row);
+    return toAdminRecord(row, this.media);
   }
 
   /**
@@ -336,7 +376,25 @@ function adminWhere(query: AdminProductQuery): Prisma.ProductWhereInput {
  * component.
  * ---------------------------------------------------------------------- */
 
-export function toDomainProduct(row: ProductRow): Product {
+/**
+ * Turns image rows into public gallery entries.
+ *
+ * The storage key never leaves the server: the driver resolves it to a URL
+ * here, and that URL is the only location the browser is ever told about.
+ */
+function toGallery(row: ProductRow, media: ProductMediaStorage): readonly ProductMedia[] {
+  return row.images.map((image) => ({
+    id: image.id,
+    src: media.publicUrl(image.storageKey),
+    alt: image.altText,
+    width: image.width,
+    height: image.height,
+    label: image.label,
+    primary: image.isPrimary,
+  }));
+}
+
+export function toDomainProduct(row: ProductRow, media: ProductMediaStorage): Product {
   const tags: ProductTag[] = [];
   if (row.bestseller) tags.push("bestSeller");
   if (row.newArrival) tags.push("newArrival");
@@ -372,12 +430,17 @@ export function toDomainProduct(row: ProductRow): Product {
     addedRank: row.sortOrder,
     art: row.artKey as ProductArtKey,
     tone: row.tone as ArtTone,
+    // Primary first, so a caller that wants one thumbnail can take images[0]
+    // without knowing the flag exists.
+    images: [...toGallery(row, media)].sort(
+      (a, b) => Number(b.primary) - Number(a.primary),
+    ),
   };
 }
 
-function toAdminRecord(row: ProductRow): AdminProductRecord {
+function toAdminRecord(row: ProductRow, media: ProductMediaStorage): AdminProductRecord {
   return {
-    product: toDomainProduct(row),
+    product: toDomainProduct(row, media),
     status: row.status,
     sortOrder: row.sortOrder,
     shortDescription: row.shortDescription,

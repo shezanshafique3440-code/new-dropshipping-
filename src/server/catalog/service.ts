@@ -3,6 +3,7 @@ import type { Product, ProductCategory } from "@/types";
 
 import { getCatalogRepository } from "./index";
 import type { CatalogRepository } from "./repository";
+import { isProductSlug } from "./validation";
 
 /**
  * The storefront's view of the catalogue.
@@ -33,7 +34,10 @@ export async function findPublishedProduct(
   slug: string,
   options?: CatalogServiceOptions,
 ): Promise<Product | null> {
-  if (!slug || slug.length > 160) {
+  // Shape-checked before it reaches the database: a path segment arrives
+  // decoded, so it can carry a NUL byte that PostgreSQL refuses outright.
+  // A malformed slug is a miss, not a 500.
+  if (!isProductSlug(slug)) {
     return null;
   }
   return repo(options).findPublishedBySlug(slug);

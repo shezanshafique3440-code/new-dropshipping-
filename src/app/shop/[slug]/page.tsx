@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ProductPurchasePanel } from "@/components/cart/ProductPurchasePanel";
-import { ProductArtwork } from "@/components/product/ProductArtwork";
+import { ProductGallery } from "@/components/product/ProductGallery";
 import { ProductCard } from "@/components/product/ProductCard";
 import { Rating } from "@/components/product/Rating";
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
@@ -157,42 +157,25 @@ export default async function ProductPage({ params }: ProductPageProps) {
       <section className="section-y-sm">
         <Container className="grid gap-10 lg:grid-cols-2 lg:gap-14">
           {/* Visual */}
-          <div className="flex flex-col gap-4">
-            <div className="relative overflow-hidden rounded-3xl border border-border shadow-card">
-              <ProductArtwork
-                art={product.art}
-                tone={product.tone}
-                ratio="square"
-                glyph="large"
-                zoom={false}
-              />
-              <span className="absolute inset-x-4 top-4 flex flex-wrap gap-2">
-                {product.badge ? (
-                  <Badge variant={badgeVariants[product.badge.tone]}>
-                    {product.badge.label}
-                  </Badge>
-                ) : null}
-                {discount === undefined ? null : (
-                  <Badge variant="sale">{`-${discount}%`}</Badge>
-                )}
-              </span>
-            </div>
-
-            {/* Alternate tints stand in for a gallery until photography exists. */}
-            <ul aria-hidden="true" className="grid grid-cols-3 gap-3">
-              {(["violet", "cyan", "neutral"] as const).map((tone) => (
-                <li key={tone}>
-                  <div className="overflow-hidden rounded-2xl border border-border-subtle">
-                    <ProductArtwork
-                      art={product.art}
-                      tone={tone}
-                      ratio="square"
-                      zoom={false}
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
+          <div className="relative flex flex-col gap-4">
+            <ProductGallery
+              images={product.images}
+              productName={product.name}
+              art={product.art}
+              tone={product.tone}
+            />
+            {/* Sits over the gallery's first frame. `pointer-events-none` so
+                it cannot swallow a swipe that starts on top of a badge. */}
+            <span className="pointer-events-none absolute inset-x-4 top-4 flex flex-wrap gap-2">
+              {product.badge ? (
+                <Badge variant={badgeVariants[product.badge.tone]}>
+                  {product.badge.label}
+                </Badge>
+              ) : null}
+              {discount === undefined ? null : (
+                <Badge variant="sale">{`-${discount}%`}</Badge>
+              )}
+            </span>
           </div>
 
           {/* Details */}

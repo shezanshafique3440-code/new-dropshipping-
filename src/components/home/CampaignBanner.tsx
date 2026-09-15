@@ -1,9 +1,10 @@
-import { ProductArtwork } from "@/components/product/ProductArtwork";
+import { ProductImage } from "@/components/product/ProductImage";
 import { Badge } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Container } from "@/components/ui/Container";
 import { Icon } from "@/components/ui/Icon";
+import { IMAGE_SIZES } from "@/lib/product-media";
 import type { Product } from "@/types";
 
 
@@ -105,19 +106,25 @@ export function CampaignBanner({
                 <div className="animate-float-soft flex flex-col gap-3 pt-6 sm:gap-4 sm:pt-10">
                   {lamp ? (
                     <Card variant="glass" className="overflow-hidden">
-                      <ProductArtwork
-                        art={lamp.art}
-                        tone={lamp.tone}
+                      {/* The wrapper is aria-hidden: this whole composition
+                          is decoration beside the copy that carries the story. */}
+                      <ProductImage
+                        product={lamp}
                         ratio="square"
+                        sizes={IMAGE_SIZES.card}
+                        alt=""
                       />
                     </Card>
                   ) : null}
                   {speaker ? (
                     <Card variant="glass" className="overflow-hidden">
-                      <ProductArtwork
-                        art={speaker.art}
-                        tone={speaker.tone}
+                      {/* The wrapper is aria-hidden: this whole composition
+                          is decoration beside the copy that carries the story. */}
+                      <ProductImage
+                        product={speaker}
                         ratio="square"
+                        sizes={IMAGE_SIZES.card}
+                        alt=""
                       />
                     </Card>
                   ) : null}
@@ -125,10 +132,13 @@ export function CampaignBanner({
                 <div className="animate-float-soft [animation-delay:2.5s]">
                   {backpack ? (
                     <Card variant="glass" className="overflow-hidden">
-                      <ProductArtwork
-                        art={backpack.art}
-                        tone={backpack.tone}
+                      {/* The wrapper is aria-hidden: this whole composition
+                          is decoration beside the copy that carries the story. */}
+                      <ProductImage
+                        product={backpack}
                         ratio="portrait"
+                        sizes={IMAGE_SIZES.card}
+                        alt=""
                       />
                     </Card>
                   ) : null}

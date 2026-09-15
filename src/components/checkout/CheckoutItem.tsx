@@ -1,4 +1,4 @@
-import { ProductArtwork } from "@/components/product/ProductArtwork";
+import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { getCartLineTotal } from "@/lib/cart";
 import { formatPrice } from "@/lib/format";
 import type { CartItem } from "@/types";
@@ -20,11 +20,11 @@ export function CheckoutItem({ item }: CheckoutItemProps) {
     <li className="flex items-start gap-3.5">
       <span className="relative shrink-0 self-start">
         <span className="block w-16 overflow-hidden rounded-xl border border-border-subtle">
-          <ProductArtwork
+          <ProductThumbnail
+            image={item.image}
             art={item.art}
             tone={item.tone}
-            ratio="square"
-            zoom={false}
+            decorative
           />
         </span>
         <span

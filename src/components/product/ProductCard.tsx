@@ -2,11 +2,12 @@ import Link from "next/link";
 
 import { AddToCartIconButton } from "@/components/cart/AddToCartIconButton";
 import { FavoriteButton } from "@/components/product/FavoriteButton";
-import { ProductArtwork } from "@/components/product/ProductArtwork";
+import { ProductImage } from "@/components/product/ProductImage";
 import { Rating } from "@/components/product/Rating";
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { productHref } from "@/lib/catalog";
+import { IMAGE_SIZES } from "@/lib/product-media";
 import { formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Product, ProductBadgeTone } from "@/types";
@@ -38,17 +39,7 @@ export function ProductCard({
   showRating = false,
   className,
 }: ProductCardProps) {
-  const {
-    name,
-    category,
-    slug,
-    price,
-    compareAtPrice,
-    badge,
-    rating,
-    art,
-    tone,
-  } = product;
+  const { name, category, slug, price, compareAtPrice, badge, rating } = product;
   const discount =
     compareAtPrice === undefined
       ? undefined
@@ -65,7 +56,9 @@ export function ProductCard({
       )}
     >
       <div className="relative">
-        <ProductArtwork art={art} tone={tone} />
+        {/* The card already names the product in its heading, so the image
+            repeats it for no one: marked decorative rather than read twice. */}
+        <ProductImage product={product} sizes={IMAGE_SIZES.card} alt="" />
 
         <div className="pointer-events-none absolute inset-x-3 top-3 flex items-start justify-between gap-2">
           {/* `min-w-0` and the truncation matter now that badge labels are

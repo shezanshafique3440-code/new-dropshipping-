@@ -15,9 +15,16 @@ import type { ArtTone, Order, Product, ProductArtKey } from "@/types";
  * live quote. The same goes for the item names — they are the snapshot taken
  * when the order was paid for.
  *
- * The catalogue is consulted for exactly two things: the artwork to draw, and
- * whether a product page still exists to link to. Both are absent when the
- * product has gone, and neither can change what the order says.
+ * The catalogue is consulted for exactly three presentational things: the
+ * image to show, the artwork to fall back to, and whether a product page
+ * still exists to link to. All three are absent when the product has gone,
+ * and none of them can change what the order says.
+ *
+ * In particular the *image* is looked up live rather than stored against the
+ * order. An order line is a financial record and holds no foreign key into
+ * the gallery: reordering a gallery or deleting a photograph must never
+ * rewrite a receipt, and a product that has been removed entirely simply
+ * shows a placeholder beside the name that was charged for.
  */
 
 export interface CustomerOrderItemView {
@@ -31,6 +38,16 @@ export interface CustomerOrderItemView {
   /** Artwork for the product if it still exists; null draws a placeholder. */
   art: ProductArtKey | null;
   tone: ArtTone | null;
+  /** The product's current primary image, if it still has one. */
+  image: OrderItemImageView | null;
+}
+
+/** Just enough of a gallery entry to render a thumbnail. */
+export interface OrderItemImageView {
+  src: string;
+  alt: string;
+  width: number;
+  height: number;
 }
 
 export interface CustomerOrderSummaryView {
@@ -43,7 +60,12 @@ export interface CustomerOrderSummaryView {
   /** Total units, so "3 items" counts quantities rather than lines. */
   itemCount: number;
   /** Enough of the basket to recognise the order in a list. */
-  preview: readonly { name: string; art: ProductArtKey | null; tone: ArtTone | null }[];
+  preview: readonly {
+    name: string;
+    art: ProductArtKey | null;
+    tone: ArtTone | null;
+    image: OrderItemImageView | null;
+  }[];
 }
 
 export interface CustomerOrderDetailView extends CustomerOrderSummaryView {
@@ -62,8 +84,21 @@ export interface CustomerOrderDetailView extends CustomerOrderSummaryView {
 /** How many product thumbnails a list row shows. */
 const PREVIEW_LIMIT = 3;
 
-/** Artwork and links for the products an order mentions, if they still exist. */
+/** Artwork, images and links for the products an order mentions, if they still exist. */
 export type OrderArtworkLookup = ReadonlyMap<string, Product>;
+
+/**
+ * The product's primary image, flattened for transport.
+ *
+ * Reads what the catalogue has *now*. Nothing is copied into the order, so
+ * there is no snapshot here to go stale and no relation from `order_items`
+ * into `product_images`.
+ */
+function toImageView(product: Product | undefined): OrderItemImageView | null {
+  const image = product?.images.find((entry) => entry.primary) ?? product?.images[0];
+  if (!image) return null;
+  return { src: image.src, alt: image.alt, width: image.width, height: image.height };
+}
 
 export function toCustomerOrderSummary(
   order: Order,
@@ -83,6 +118,7 @@ export function toCustomerOrderSummary(
         name: item.name,
         art: product?.art ?? null,
         tone: product?.tone ?? null,
+        image: toImageView(product),
       };
     }),
   };
@@ -118,6 +154,7 @@ export function toCustomerOrderDetail(
         href: product ? `/shop/${product.slug}` : null,
         art: product?.art ?? null,
         tone: product?.tone ?? null,
+        image: toImageView(product),
       };
     }),
   };

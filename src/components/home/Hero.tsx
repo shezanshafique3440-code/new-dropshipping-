@@ -1,10 +1,11 @@
-import { ProductArtwork } from "@/components/product/ProductArtwork";
+import { ProductImage } from "@/components/product/ProductImage";
 import { Badge } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Container } from "@/components/ui/Container";
 import { Icon } from "@/components/ui/Icon";
 import { formatPrice } from "@/lib/format";
+import { IMAGE_SIZES } from "@/lib/product-media";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/types";
 
@@ -12,9 +13,12 @@ import type { Product } from "@/types";
 function HeroTile({
   product,
   className,
+  priority = false,
 }: {
   product: Product;
   className?: string;
+  /** Preloads the image. Only the first tile in the composition sets it. */
+  priority?: boolean;
 }) {
   return (
     <Card
@@ -22,7 +26,16 @@ function HeroTile({
       interactive
       className={cn("overflow-hidden", className)}
     >
-      <ProductArtwork art={product.art} tone={product.tone} ratio="square" />
+      {/* The tile prints the product's name underneath, so the image is
+          decorative here rather than described twice. The first hero tile is
+          the page's largest above-the-fold image, so it is preloaded. */}
+      <ProductImage
+        product={product}
+        ratio="square"
+        sizes={IMAGE_SIZES.hero}
+        alt=""
+        priority={priority}
+      />
       <div className="flex items-center justify-between gap-3 p-3.5">
         <div className="min-w-0">
           <p className="type-caption text-foreground-subtle">
@@ -131,7 +144,9 @@ export function Hero({ products }: HeroProps) {
             <div className="animate-float-soft flex flex-col gap-3 sm:gap-4 [animation-delay:2s]">
               {primary ? (
                 <div className="relative">
-                  <HeroTile product={primary} />
+                  {/* The largest tile in the composition and the one the
+                      eye lands on: worth preloading, and the only one that is. */}
+                  <HeroTile product={primary} priority />
                   <Badge
                     variant="floating"
                     className="absolute top-2.5 right-2.5"

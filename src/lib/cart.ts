@@ -3,6 +3,7 @@ import {
   PRODUCT_ART_KEYS,
   PRODUCT_CATEGORIES,
   type CartItem,
+  type CartItemImage,
   type CartState,
   type Product,
 } from "@/types";
@@ -53,6 +54,7 @@ export function toCartItem(product: Product, quantity: number): CartItem | null 
   if (!isValidPrice(product.price)) {
     return null;
   }
+  const image = product.images.find((entry) => entry.primary) ?? product.images[0];
   return {
     productId: product.id,
     slug: product.slug,
@@ -62,6 +64,16 @@ export function toCartItem(product: Product, quantity: number): CartItem | null 
     quantity: sanitizeQuantity(quantity),
     art: product.art,
     tone: product.tone,
+    ...(image
+      ? {
+          image: {
+            src: image.src,
+            alt: image.alt,
+            width: image.width,
+            height: image.height,
+          },
+        }
+      : {}),
     ...(product.badge ? { badge: product.badge } : {}),
   };
 }
@@ -178,6 +190,38 @@ function isOneOf<T extends string>(
  * validation is dropped rather than rendered — a corrupted entry must never
  * reach the UI or the totals.
  */
+/**
+ * Validates a stored thumbnail before it is rendered.
+ *
+ * Local storage is not trusted input: it survives across sessions, it is
+ * writable by anything running on this origin, and its contents end up in an
+ * `src` attribute. So the shape is checked and the source has to be either a
+ * relative path under the media folder or a plain https URL — never a
+ * `javascript:` or `data:` source, never a protocol-relative `//host`, never
+ * a backslash. Anything else drops the thumbnail and the line falls back to
+ * the artwork panel, which is a cosmetic loss rather than a broken page.
+ */
+function reviveImage(raw: unknown): CartItemImage | undefined {
+  if (!isRecord(raw)) return undefined;
+  const { src, alt, width, height } = raw;
+
+  if (typeof src !== "string" || src.length === 0 || src.length > 500) return undefined;
+  if (typeof alt !== "string" || alt.length > 400) return undefined;
+  if (!isPositiveInteger(width) || !isPositiveInteger(height)) return undefined;
+  if (width > 10_000 || height > 10_000) return undefined;
+
+  const relative =
+    src.startsWith("/products/") && !src.includes("\\") && !src.includes("//");
+  const remote = /^https:\/\/[^\s"'\\]+$/.test(src);
+  if (!relative && !remote) return undefined;
+
+  return { src, alt, width, height };
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
 function reviveItem(raw: unknown): CartItem | null {
   if (!isRecord(raw)) {
     return null;
@@ -200,6 +244,8 @@ function reviveItem(raw: unknown): CartItem | null {
     return null;
   }
 
+  const image = reviveImage(raw.image);
+
   return {
     productId,
     slug,
@@ -209,6 +255,7 @@ function reviveItem(raw: unknown): CartItem | null {
     quantity: sanitizeQuantity(raw.quantity),
     art,
     tone,
+    ...(image ? { image } : {}),
   };
 }
 

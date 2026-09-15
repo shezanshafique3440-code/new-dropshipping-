@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminProductForm } from "@/components/admin/AdminProductForm";
 import { ProductStatusBadge } from "@/components/admin/ProductStatusBadge";
+import { ProductMediaManager } from "@/components/admin/ProductMediaManager";
 import { ProductStatusControl } from "@/components/admin/ProductStatusControl";
 import { ProductArtwork } from "@/components/product/ProductArtwork";
 import { Icon } from "@/components/ui/Icon";
@@ -12,6 +13,7 @@ import { formatDate } from "@/lib/format";
 import { adminProductsHref, productHref } from "@/lib/routes";
 import { requireAdmin } from "@/server/admin/current-admin";
 import { getAdminProduct } from "@/server/catalog/admin-service";
+import { getProductMedia } from "@/server/media/admin-service";
 import type { ArtTone, ProductArtKey } from "@/types";
 
 export const metadata: Metadata = {
@@ -36,7 +38,13 @@ export default async function AdminProductPage({ params }: AdminProductPageProps
   const { admin } = await requireAdmin();
   const { slug } = await params;
 
-  const product = await getAdminProduct(admin, slug);
+  // Both reads are scoped to the administrator resolved above, and both are
+  // issued together: the gallery is not a second round trip waiting on the
+  // product.
+  const [product, media] = await Promise.all([
+    getAdminProduct(admin, slug),
+    getProductMedia(admin, slug),
+  ]);
   if (!product) {
     notFound();
   }
@@ -99,11 +107,21 @@ export default async function AdminProductPage({ params }: AdminProductPageProps
           </section>
 
           <section
+            aria-labelledby="product-media-heading"
+            className="flex flex-col gap-4 rounded-2xl border border-border bg-surface p-5"
+          >
+            <h2 id="product-media-heading" className="type-h5">
+              Images
+            </h2>
+            {media ? <ProductMediaManager slug={product.slug} media={media} /> : null}
+          </section>
+
+          <section
             aria-labelledby="product-preview-heading"
             className="flex flex-col gap-4 rounded-2xl border border-border bg-surface p-5"
           >
             <h2 id="product-preview-heading" className="type-h5">
-              Artwork
+              Fallback artwork
             </h2>
             <div className="overflow-hidden rounded-xl border border-border-subtle">
               <ProductArtwork
@@ -114,8 +132,9 @@ export default async function AdminProductPage({ params }: AdminProductPageProps
               />
             </div>
             <p className="type-caption text-foreground-subtle">
-              Drawn from the built-in illustration set. The database stores the
-              key, not an image.
+              Drawn from the built-in illustration set. The shop uses this only
+              when the product has no images at all — the database stores the
+              key, never an image.
             </p>
           </section>
 

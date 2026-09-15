@@ -752,6 +752,18 @@
 }
 
 /* Scales a nested [data-zoom] image without moving the card itself. */
+/* Hides the scrollbar on a swipeable strip while leaving it scrollable —
+   the gallery's thumbnails and the browser's own overscroll are the affordance
+   there, and a permanent bar across a product image is noise. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @utility hover-zoom {
   & [data-zoom] {
     transition: transform 0.5s var(--ease-out-soft);

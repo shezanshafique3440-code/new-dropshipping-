@@ -1,3 +1,4 @@
+import NextImage from "next/image";
 import Link from "next/link";
 
 import { ProductStatusBadge } from "@/components/admin/ProductStatusBadge";
@@ -49,10 +50,13 @@ export function AdminProductList({ products }: AdminProductListProps) {
                 className="border-b border-border-subtle last:border-b-0 hover:bg-surface-muted/60"
               >
                 <Td>
-                  <span className="flex min-w-0 flex-col">
-                    <span className="truncate font-semibold">{product.name}</span>
-                    <span className="type-caption truncate text-foreground-subtle">
-                      {product.slug}
+                  <span className="flex min-w-0 items-center gap-3">
+                    <ListThumbnail product={product} />
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate font-semibold">{product.name}</span>
+                      <span className="type-caption truncate text-foreground-subtle">
+                        {product.slug}
+                      </span>
                     </span>
                   </span>
                 </Td>
@@ -102,10 +106,13 @@ export function AdminProductList({ products }: AdminProductListProps) {
               href={adminProductHref(product.slug)}
               className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4 transition-[border-color,box-shadow] duration-200 hover:border-border-strong hover:shadow-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
             >
-              <span className="flex min-w-0 flex-col">
-                <span className="font-semibold break-words">{product.name}</span>
-                <span className="type-caption truncate text-foreground-subtle">
-                  {product.slug}
+              <span className="flex min-w-0 items-center gap-3">
+                <ListThumbnail product={product} />
+                <span className="flex min-w-0 flex-col">
+                  <span className="font-semibold break-words">{product.name}</span>
+                  <span className="type-caption truncate text-foreground-subtle">
+                    {product.slug}
+                  </span>
                 </span>
               </span>
 
@@ -177,6 +184,35 @@ function money(minor: number, currency: string): string {
   } catch {
     return `${fromMinorUnits(minor).toFixed(2)} ${currency.toUpperCase()}`;
   }
+}
+
+/**
+ * The row's thumbnail.
+ *
+ * Decorative — the product's name is right beside it — and it doubles as the
+ * list's "has this product been photographed yet?" signal: a product with no
+ * images shows a marked placeholder rather than silently looking finished.
+ */
+function ListThumbnail({ product }: { product: AdminProductView }) {
+  return (
+    <span className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-lg border border-border-subtle bg-surface-muted">
+      {product.primaryImage ? (
+        <NextImage
+          src={product.primaryImage.src}
+          alt=""
+          width={product.primaryImage.width}
+          height={product.primaryImage.height}
+          sizes="44px"
+          className="size-full object-cover"
+        />
+      ) : (
+        <>
+          <Icon name="bag" className="size-4 text-foreground-subtle" />
+          <span className="sr-only">No images yet</span>
+        </>
+      )}
+    </span>
+  );
 }
 
 function Th({

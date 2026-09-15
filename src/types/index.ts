@@ -60,6 +60,19 @@ export interface NewsletterConfig {
   note: string;
 }
 
+/**
+ * How the storefront describes its own product imagery.
+ *
+ * Present because the catalogue currently ships generated studio renders
+ * rather than photographs, and saying so is the honest thing to do. When real
+ * photography replaces them this line changes — it does not disappear
+ * quietly, because somebody has to decide it is no longer true.
+ */
+export interface MediaConfig {
+  /** One sentence shown under a product gallery. */
+  disclosure: string;
+}
+
 export interface ShippingConfig {
   /** The storefront's stated free-delivery threshold, in major units. */
   freeThreshold: number;
@@ -76,6 +89,7 @@ export interface SiteConfig {
   currency: CurrencyConfig;
   contact: ContactConfig;
   shipping: ShippingConfig;
+  media: MediaConfig;
   announcement: AnnouncementConfig;
   newsletter: NewsletterConfig;
   nav: {
@@ -188,6 +202,30 @@ export interface ProductRating {
   count: number;
 }
 
+/**
+ * One image in a product's gallery, as everything above the server sees it.
+ *
+ * `src` is a public URL and nothing else: never a storage key, never a
+ * filesystem path, never a signed or credentialed URL. The storage driver
+ * produced it on the server, and swapping `public/` for a CDN changes this
+ * string and nothing else in the application.
+ *
+ * `width`/`height` are the intrinsic pixel size, so `next/image` reserves the
+ * right box and the page does not shift as the gallery loads.
+ */
+export interface ProductMedia {
+  id: string;
+  src: string;
+  /** Always meaningful — an empty alt on a product image is a defect. */
+  alt: string;
+  width: number;
+  height: number;
+  /** Short label for the gallery thumbnail, e.g. "front view". */
+  label: string;
+  /** The card, cart and checkout thumbnail. Exactly one per gallery. */
+  primary: boolean;
+}
+
 export interface Product {
   id: string;
   /** URL segment: `/shop/<slug>`. Unique across the catalogue. */
@@ -228,6 +266,14 @@ export interface Product {
   addedRank: number;
   art: ProductArtKey;
   tone: ArtTone;
+  /**
+   * The product's gallery, in gallery order, primary first.
+   *
+   * Empty is a legitimate state — a product whose photography has not been
+   * shot yet — and the UI falls back to the generated artwork panel rather
+   * than to a broken image.
+   */
+  images: readonly ProductMedia[];
 }
 
 /**
@@ -240,7 +286,10 @@ export interface Product {
  * readable and still be type-checked.
  */
 export interface SeedProduct
-  extends Omit<Product, "priceAmount" | "compareAtPriceAmount" | "currency"> {
+  extends Omit<
+    Product,
+    "priceAmount" | "compareAtPriceAmount" | "currency" | "images"
+  > {
   compareAtPrice?: number;
 }
 
@@ -255,6 +304,22 @@ export interface SeedProduct
  * catalogue, and so a persisted cart survives a catalogue change. Lines are
  * reconciled against the catalogue on load — see `@/lib/cart`.
  */
+/**
+ * A cart line's image, snapshotted alongside the price and the name.
+ *
+ * The cart is held in the browser and must render before anything is fetched,
+ * so the line carries its own thumbnail rather than looking one up. It is a
+ * snapshot like every other field here: if the product's gallery changes, the
+ * line catches up the next time it is added, and until then it shows what the
+ * shopper saw when they added it.
+ */
+export interface CartItemImage {
+  src: string;
+  alt: string;
+  width: number;
+  height: number;
+}
+
 export interface CartItem {
   productId: string;
   slug: string;
@@ -266,6 +331,8 @@ export interface CartItem {
   quantity: number;
   art: ProductArtKey;
   tone: ArtTone;
+  /** Absent for a product with no gallery — the artwork panel is drawn. */
+  image?: CartItemImage;
   badge?: ProductBadge;
 }
 

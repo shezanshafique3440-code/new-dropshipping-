@@ -26,6 +26,13 @@ export const siteConfig: SiteConfig = {
   shipping: {
     freeThreshold: 75,
   },
+  media: {
+    // The catalogue's imagery is drawn by this repository and rendered by
+    // `scripts/generate-product-media.mjs`. It is not photography, and the
+    // storefront says so rather than letting a shopper assume otherwise.
+    disclosure:
+      "Product visuals are ZYVERO studio renders, not photographs of the finished item.",
+  },
   announcement: {
     message: "Free worldwide delivery on orders over {amount}",
     amount: 75,

@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { OrderStatusBadges } from "@/components/account/OrderStatusBadges";
-import { ProductArtwork } from "@/components/product/ProductArtwork";
+import { ProductThumbnail } from "@/components/product/ProductThumbnail";
 import { Icon } from "@/components/ui/Icon";
 import { formatDate, formatPrice } from "@/lib/format";
 import { fromMinorUnits } from "@/lib/money";
@@ -55,13 +55,12 @@ export function OrderSummaryRow({ order }: OrderSummaryRowProps) {
                 key={`${item.name}-${index}`}
                 className="block w-11 overflow-hidden rounded-xl border border-border-subtle bg-surface"
               >
-                {item.art && item.tone ? (
-                  <ProductArtwork art={item.art} tone={item.tone} ratio="square" zoom={false} />
-                ) : (
-                  <span className="grid aspect-square place-items-center bg-surface-muted text-foreground-subtle">
-                    <Icon name="bag" className="size-4" />
-                  </span>
-                )}
+                <ProductThumbnail
+                  image={item.image}
+                  art={item.art}
+                  tone={item.tone}
+                  decorative
+                />
               </span>
             ))}
           </span>

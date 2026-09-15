@@ -11,6 +11,7 @@ import type {
 } from "./repository";
 import {
   hasProductErrors,
+  isProductSlug,
   validateProduct,
   type ProductErrors,
   type ProductInput,
@@ -86,7 +87,7 @@ export async function getAdminProduct(
   options?: AdminCatalogOptions,
 ): Promise<AdminProductView | null> {
   assertActor(actor);
-  if (!slug || slug.length > 160) {
+  if (!isProductSlug(slug)) {
     return null;
   }
   const record = await repo(options).findForAdmin(slug);

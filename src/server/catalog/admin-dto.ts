@@ -39,6 +39,15 @@ export interface AdminProductView {
   sortOrder: number;
   artKey: string;
   tone: string;
+  /**
+   * The product's primary image, for the list's thumbnail.
+   *
+   * A public URL and the pixel size, nothing more: the panel's gallery
+   * management lives on the product page and reads its own, wider view.
+   */
+  primaryImage: { src: string; alt: string; width: number; height: number } | null;
+  /** How many images the gallery holds, so the list can flag the empty ones. */
+  imageCount: number;
   badgeLabel: string;
   badgeTone: string;
   /** ISO 8601. */
@@ -48,6 +57,7 @@ export interface AdminProductView {
 
 export function toAdminProductView(record: AdminProductRecord): AdminProductView {
   const { product } = record;
+  const primary = product.images.find((image) => image.primary) ?? product.images[0] ?? null;
 
   return {
     slug: product.slug,
@@ -72,6 +82,15 @@ export function toAdminProductView(record: AdminProductRecord): AdminProductView
     sortOrder: record.sortOrder,
     artKey: product.art,
     tone: product.tone,
+    primaryImage: primary
+      ? {
+          src: primary.src,
+          alt: primary.alt,
+          width: primary.width,
+          height: primary.height,
+        }
+      : null,
+    imageCount: product.images.length,
     badgeLabel: product.badge?.label ?? "",
     badgeTone: product.badge?.tone ?? "",
     createdAt: record.createdAt.toISOString(),
