@@ -63,8 +63,8 @@ model Order {
   /// What the provider actually charged. The authority for reconciliation.
   totalAmount    Int
 
-  customerEmail String  @db.VarChar(254)
-  customerName  String  @db.VarChar(200)
+  customerEmail String    @db.VarChar(254)
+  customerName  String    @db.VarChar(200)
   /// Set when the order was placed by a signed-in customer, resolved from the
   /// server-side session — never from anything the browser sent. Guest orders
   /// leave it null, and always will: ownership is never guessed after the
@@ -92,7 +92,8 @@ model Order {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
-  items OrderItem[]
+  items         OrderItem[]
+  statusHistory OrderStatusHistory[]
 
   /// Lookups a support agent or the account pages actually perform.
   ///
@@ -102,10 +103,13 @@ model Order {
   /// also serves plain "orders for this customer" lookups, so no separate
   /// single-column index is needed.
   @@index([customerId, createdAt(sort: Desc), reference(sort: Desc)])
+  /// The admin order list rides this one: every order, newest first, with the
+  /// unique reference as the tie-breaker keyset pagination needs. It subsumes
+  /// the plain `createdAt` index it replaces.
+  @@index([createdAt(sort: Desc), reference(sort: Desc)])
   @@index([customerEmail])
   @@index([status])
   @@index([paymentStatus])
-  @@index([createdAt])
   @@index([updatedAt])
   @@map("orders")
 }
@@ -216,4 +220,115 @@ model ProcessedWebhookEvent {
 
   @@index([processedAt])
   @@map("processed_webhook_events")
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * Internal operations
+ * Administrators are a separate authorization boundary, not a flag on a
+ * customer. Different table, different session table, different cookie: a
+ * shopper's session can never resolve to an administrator, whatever happens
+ * to one of the two code paths, because there is no row that could join them.
+ * ------------------------------------------------------------------------
+ */
+
+/// What an administrator may do.
+///
+/// One role today. It is an enum rather than a boolean so a narrower role
+/// (support, read-only) can be added as a value and a migration, without
+/// every authorization check having to be rewritten around a new column.
+enum AdminRole {
+  admin
+}
+
+/// A member of the operations team.
+model AdminUser {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// As typed, for display.
+  email           String @db.VarChar(254)
+  /// Trimmed and lowercased. The identity, and the unique key.
+  emailNormalized String @unique @db.VarChar(254)
+
+  name String @db.VarChar(160)
+
+  /// Argon2id PHC string, from the same hashing utility customers use.
+  /// Never leaves the server and never enters a response.
+  passwordHash String @db.VarChar(255)
+
+  role AdminRole @default(admin)
+
+  /// Access is withdrawn by clearing this, not by deleting the row: the
+  /// audit trail must keep pointing at whoever made a change.
+  isActive Boolean @default(true)
+
+  lastLoginAt DateTime? @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  sessions      AdminSession[]
+  statusChanges OrderStatusHistory[]
+
+  @@index([createdAt])
+  @@map("admin_users")
+}
+
+/// An administrator's signed-in session.
+///
+/// Same construction as a customer session — random token in an HttpOnly
+/// cookie, only its SHA-256 digest in the database — with much shorter
+/// deadlines, because an operations console left open is a bigger prize than
+/// a shopping account.
+model AdminSession {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// SHA-256 of the cookie token, hex. The raw token is never stored.
+  tokenHash String @unique @db.VarChar(64)
+
+  adminUserId String    @db.Uuid
+  adminUser   AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  /// Absolute deadline: the session dies here however active it is.
+  expiresAt  DateTime  @db.Timestamptz(3)
+  /// Moved forward as the session is used, for the idle deadline.
+  lastUsedAt DateTime  @default(now()) @db.Timestamptz(3)
+  revokedAt  DateTime? @db.Timestamptz(3)
+
+  @@index([adminUserId])
+  @@index([expiresAt])
+  @@map("admin_sessions")
+}
+
+/// Every operational change to an order's status.
+///
+/// Append-only: rows are written inside the same transaction as the status
+/// change they describe, and nothing updates or deletes them. `fromStatus`
+/// is recorded as well as `toStatus` so the trail can be read on its own,
+/// without replaying it against the order's current state.
+///
+/// The administrator is kept as a nullable reference set to null if the
+/// account is ever deleted — losing who did it is bad, losing the fact that
+/// it happened would be worse.
+model OrderStatusHistory {
+  id String @id @default(uuid()) @db.Uuid
+
+  orderId String @db.Uuid
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  fromStatus OrderStatus
+  toStatus   OrderStatus
+
+  /// Always resolved from the acting administrator's session, never from
+  /// anything the client sent.
+  changedByAdminId String?    @db.Uuid
+  changedByAdmin   AdminUser? @relation(fields: [changedByAdminId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  /// The trail for one order, newest first — the only way it is ever read.
+  @@index([orderId, createdAt(sort: Desc)])
+  @@index([createdAt])
+  @@map("order_status_history")
 }

@@ -5,16 +5,18 @@
 A premium international storefront built with Next.js (App Router), TypeScript
 and Tailwind CSS.
 
-> **Status: Step 10 — customer order history.**
+> **Status: Step 11 — admin operations.**
 > Foundation, design system, homepage, catalogue, cart, checkout, Stripe
-> payments, durable order storage, customer sign-in and order history are in
-> place. Payment runs through Stripe Checkout and is expected to be in **test
-> mode**: a live key is refused unless the deployment explicitly opts in (see
-> [Payments](#payments-stripe)). **Guest checkout remains fully supported** —
-> an account is never required to buy, and guest orders never appear in
-> anybody's history. Password reset, email verification, admin authentication,
-> fulfilment and tracking, tax, transactional email and supplier integrations
-> are deliberately **not** implemented yet.
+> payments, durable order storage, customer sign-in, order history and an
+> internal operations panel are in place. Payment runs through Stripe Checkout
+> and is expected to be in **test mode**: a live key is refused unless the
+> deployment explicitly opts in (see [Payments](#payments-stripe)). **Guest
+> checkout remains fully supported** — an account is never required to buy,
+> and guest orders never appear in anybody's history, though an operator can
+> see them. Password reset, email verification, two-factor authentication,
+> product and catalogue management, refunds, fulfilment and tracking, tax,
+> transactional email and supplier integrations are deliberately **not**
+> implemented yet.
 
 ## Getting started
 
@@ -43,6 +45,7 @@ A PostgreSQL database is required from Step 8 onwards — see
 | `npm run db:migrate`  | Create and apply a migration (development) |
 | `npm run db:deploy`   | Apply existing migrations (deployment)   |
 | `npm run db:status`   | Show which migrations have been applied  |
+| `npm run admin:bootstrap` | Create the first administrator (see [Operations panel](#operations-panel-admin)) |
 
 ## Project structure
 
@@ -59,10 +62,19 @@ src/
 │   ├── login|register/page.tsx # Authentication
 │   ├── account/page.tsx        # Signed-in account dashboard
 │   ├── account/orders/         # Order history, detail, loading, not-found
+│   ├── admin/                  # Operations panel (noindex, separate session)
+│   │   ├── login/page.tsx      # Admin sign-in, outside the shell
+│   │   └── (panel)/            # Everything behind requireAdmin()
+│   │       ├── page.tsx        # Dashboard
+│   │       ├── orders/         # List, filters, search, pagination
+│   │       ├── orders/[reference]/  # One order, with status control
+│   │       └── account/page.tsx     # The operator's own profile
 │   ├── checkout/page.tsx       # Checkout flow
 │   ├── checkout/success/       # Stripe return: verifies before confirming
 │   └── api/
 │       ├── auth/register|login|logout/route.ts
+│       ├── admin/login|logout/route.ts
+│       ├── admin/orders/[reference]/status/route.ts
 │       ├── account/profile/route.ts
 │       ├── checkout/create-session/route.ts
 │       ├── checkout/session-status/route.ts
@@ -71,6 +83,15 @@ src/
 │   ├── brand/                  # Brand identity
 │   │   ├── Wordmark.tsx        # Text-based ZYVERO wordmark + monogram
 │   │   └── BrandShowcase.tsx   # Decorative hero composition
+│   ├── admin/                  # Operations panel UI
+│   │   ├── AdminShell.tsx      # client — sidebar, mobile drawer
+│   │   ├── AdminNav.tsx        # client — sections, aria-current
+│   │   ├── AdminLoginForm.tsx  # client — sign-in
+│   │   ├── AdminDashboard.tsx  # KPI cards from real aggregates
+│   │   ├── AdminOrderList.tsx  # table on desk, cards on a phone
+│   │   ├── AdminOrderFilters.tsx    # client — search and filters, in the URL
+│   │   ├── AdminOrderDetail.tsx     # one order, operator's view
+│   │   └── OrderStatusControl.tsx   # client — cancel, with confirmation
 │   ├── layout/                 # Shell composition (server-first)
 │   │   ├── Header.tsx          # Sticky glass header
 │   │   ├── AnnouncementBar.tsx
@@ -92,6 +113,8 @@ src/
 ├── hooks/useLockBodyScroll.ts
 ├── lib/                        # env, format, money, cart, checkout, catalog, routes
 ├── server/                     # server-only: never imported by a client component
+│   ├── admin/                  # administrators: sessions, authorization, bootstrap
+│   │   └── orders/             # admin order repository, DTO, query parsing, service
 │   ├── auth/                   # passwords, sessions, customers, authorization
 │   ├── db/                     # Prisma client singleton + connection config
 │   ├── http/                   # same-origin (CSRF) checks
@@ -99,11 +122,15 @@ src/
 │   ├── payments/               # Stripe client, config, validation, session, orders
 │   └── rate-limit.ts
 ├── styles/globals.css          # Tokens, theme mapping, utilities
+├── proxy.ts                    # Edge gate for /account and /admin (was middleware.ts)
 └── types/index.ts
 prisma/
-├── schema.prisma               # Order, OrderItem, ProcessedWebhookEvent
+├── schema.prisma               # Order, OrderItem, Customer, AdminUser, sessions, history
 └── migrations/                 # Committed, applied in order
 prisma.config.ts                # Where the Prisma CLI reads DATABASE_URL
+scripts/
+├── bootstrap-admin.mjs         # `npm run admin:bootstrap`
+└── ts-resolve*.mjs             # Lets node run the app's TypeScript directly
 public/images  public/icons
 ```
 
@@ -209,7 +236,14 @@ the public order reference).
 | `Customer`              | A registered shopper: normalized email, name, Argon2id hash        |
 | `CustomerSession`       | A signed-in session: token digest, deadlines, revocation           |
 | `OrderItem`             | An immutable snapshot of one purchased line                       |
+| `AdminUser`             | A member of the operations team: normalized email, name, role, Argon2id hash, active flag |
+| `AdminSession`          | An administrator's session: token digest, deadlines, revocation    |
+| `OrderStatusHistory`    | Append-only trail of manual status changes: from, to, which administrator, when |
 | `ProcessedWebhookEvent` | Stripe event ids already handled, so a retry cannot be processed twice |
+
+Administrators are a separate table from customers on purpose, with their own
+session table and their own cookie: there is no row that could turn a shopper
+into an operator. See [Operations panel](#operations-panel-admin).
 
 Money is stored as integers in minor units (cents). No monetary value is ever
 a float, in the database or in the application.
@@ -471,9 +505,231 @@ node orders-a11y.mjs         # accessibility plus 320-1920px in both themes
 ### Not implemented in this step
 
 Password reset, email verification, "sign out everywhere" UI, two-factor
-authentication, social sign-in, admin authentication, order cancellation or
-refunds from the account, and fulfilment tracking. The pages say so rather
-than showing empty widgets.
+authentication, social sign-in, and cancelling or refunding an order from the
+account. The pages say so rather than showing empty widgets. (Administrators
+arrived in the next step and can cancel an order; a customer still cannot, and
+refunds happen in Stripe.)
+
+## Operations panel (admin)
+
+An internal panel for the people who run the shop: see the orders, find one,
+and cancel it. It is a **separate authorization boundary** from the storefront
+— different table, different session store, different cookie — so a customer
+account can never become an administrator, however the storefront's own code
+changes.
+
+### Setting up the first administrator
+
+There is no sign-up, and no password anywhere in this repository. An
+administrator exists only because somebody ran the bootstrap script with
+credentials they chose:
+
+```bash
+ADMIN_BOOTSTRAP_EMAIL=you@example.com \
+ADMIN_BOOTSTRAP_PASSWORD='a long passphrase you chose' \
+ADMIN_BOOTSTRAP_NAME='Your Name' \
+npm run admin:bootstrap
+```
+
+The variables can live in `.env.local` instead (it is git-ignored). Both the
+address and the password are required and neither has a default. The password
+is hashed with the application's own Argon2id utility — the same one customer
+passwords use — and is never printed, logged or stored in any other form.
+
+Running it twice is safe: an address that already has an account is left
+exactly as it is (the password is **not** silently rotated), and an account
+that had been deactivated is switched back on.
+
+In production the script additionally refuses to run unless
+`ADMIN_BOOTSTRAP_ALLOW_PRODUCTION=true` is set, the same safety catch the
+Stripe live-key check uses. Nothing creates an administrator merely because
+the application started.
+
+### Routes
+
+| Route                         | What it is                                      |
+| ----------------------------- | ----------------------------------------------- |
+| `/admin/login`                | Sign-in. The only admin route without a session  |
+| `/admin`                      | Dashboard: order figures and the latest orders   |
+| `/admin/orders`               | Every order, with search, filters and paging     |
+| `/admin/orders/[reference]`   | One order, with the status control and its trail |
+| `/admin/account`              | The operator's own name, address and role        |
+| `POST /api/admin/login`       | Creates an admin session                         |
+| `POST /api/admin/logout`      | Revokes it server-side and clears the cookie     |
+| `POST /api/admin/orders/[reference]/status` | The one state-changing endpoint    |
+
+Every admin page and response is `noindex, nofollow` and `no-store`.
+
+### Authentication and sessions
+
+Administrators live in `admin_users`, their sessions in `admin_sessions`, and
+the browser holds a 256-bit random token in a cookie named
+**`zyvero_admin_session`** — deliberately not the storefront's
+`zyvero_session`. The database stores only the token's SHA-256 digest, so a
+database dump cannot be replayed as a login.
+
+|                     | Customer session   | Admin session      |
+| ------------------- | ------------------ | ------------------ |
+| Cookie              | `zyvero_session`   | `zyvero_admin_session` |
+| Absolute lifetime   | 30 days            | 8 hours            |
+| Idle lifetime       | 7 days             | 30 minutes         |
+| `SameSite`          | `Lax`              | `Strict`           |
+| `HttpOnly`          | yes                | yes                |
+| `Secure`            | in production      | in production      |
+
+The admin cookie is `Strict` because nothing legitimately navigates into the
+panel from another site; the storefront's is `Lax` only because the browser
+has to come back from Stripe's hosted checkout. Both are `HttpOnly`, so no
+script can read them, and revocation is a column update rather than a delete
+— signing out kills the session server-side, not just in the browser.
+
+### Authorization
+
+`requireAdmin()` resolves admin cookie → admin session row → **active**
+administrator, and is the only thing that grants access. It runs **in every
+panel page**, not only in the shared layout: Next.js renders a layout and its
+page in parallel, so a layout that redirects does not stop the page from
+running or from putting its data in the RSC payload. (Next's own
+authentication guide says as much; this project found out by testing it.)
+
+Below that, the admin data functions take the resolved administrator as a
+required argument — `listAdminOrders(admin, …)`, `changeOrderStatus(admin, …)`
+— so a page that has not proved who is asking cannot compile, let alone read
+an order. Nothing is ever taken from a request body, a query string, a header
+or a hidden field: not a customer id, not an admin id, not a role.
+
+`src/proxy.ts` (Next 16's renamed `middleware.ts`) redirects to the right
+sign-in page when the relevant cookie is missing. It is an optimisation, not
+the authorization — a made-up cookie value sails straight through it, and is
+then refused by the page.
+
+### Dashboard figures
+
+Six numbers, each a count or a sum PostgreSQL produced from the orders table,
+in two grouped aggregate queries. No conversion rate, no average-order-value
+trend, no visitor count: the application does not measure those, and a
+plausible figure nobody can trace is worse than no figure.
+
+"Payments received" is deliberately narrow — the total of orders whose payment
+**settled and has not been refunded**, summed **per currency**, because adding
+a euro to a dollar would be a made-up number. Unpaid, failed, cancelled and
+refunded orders are all excluded from it.
+
+### Search, filters and pagination
+
+All three are server-side and all three live in the URL, so a filtered view is
+a link somebody can send to a colleague:
+
+- **Search** matches a full order reference (case-insensitively — `zyv-a1b2c3`
+  finds the order) or part of a customer's email address. Both reach Prisma as
+  parameters; no user input is ever concatenated into SQL. The email search is
+  a case-insensitive substring match, which PostgreSQL answers with a scan:
+  honest at this size, and a `pg_trgm` index is the right addition when the
+  table is large enough for that to show — not before, on a guess.
+- **Filters** are checked against the real enums. Anything unrecognised
+  degrades to "no filter" rather than erroring, and the "Clear" control
+  removes them all.
+- **Pagination** is keyset, on `(createdAt DESC, reference DESC)`, twenty per
+  page, using the same opaque cursor the order history uses. Changing a filter
+  drops the cursor. One extra row is read to decide whether there is a next
+  page, instead of a second `COUNT` over the filtered set.
+
+The `orders(createdAt DESC, reference DESC)` index added in the
+`admin_operations` migration serves exactly this ordering; it replaces the
+plain `createdAt` index, whose every use it covers.
+
+### Order status: what an operator may change
+
+**Cancelling, and nothing else.** The options are derived from the same state
+machine the Stripe webhook obeys (`src/server/orders/transitions.ts`) with the
+payment status held fixed, so the panel cannot widen the rules — and
+`assertTransition` re-checks before anything is written.
+
+**Payment status is not editable from the panel.** There is no "mark as paid"
+button, and a `paymentStatus` in the request body changes nothing: money is
+Stripe's to report, and a manual override would let this table contradict the
+payment provider. Cancelling an order is not a refund, and the confirmation
+says so — refunds are issued in Stripe.
+
+The change is a compare-and-set inside a transaction: it applies only while
+the order is still in the state the server validated against, so two operators
+cancelling the same order at the same moment produce one status change and one
+audit row, and the second is told it lost rather than silently succeeding.
+
+### Audit trail
+
+Every manual status change writes a row to `order_status_history` —
+`fromStatus`, `toStatus`, which administrator, when — in the same transaction
+as the change, so the trail can never disagree with the order. Rows are
+append-only, and the administrator is a nullable reference set to null if the
+account is ever deleted: losing who did it would be bad, losing the fact that
+it happened would be worse. The trail is shown on the order page, and it
+covers manual changes only — payment events belong to Stripe's own record.
+
+### What an operator can see, and what nobody can
+
+The admin projection is wider than the customer's — the full delivery address
+for every order, whether the shopper had an account, the Stripe **payment
+intent** id for reconciliation — and it is still hand-written. It contains no
+password hash, no session token or digest, no API or webhook secret, no
+Checkout Session id, no database uuid for the order, the customer or the
+administrator, and no card data (this application has never held any: payment
+happens on Stripe's page).
+
+Guest orders **are** visible to an operator. That is the point of the panel,
+and it is not a change to the storefront rule: a guest order still belongs to
+no account and still cannot appear in anybody's order history.
+
+### Rate limiting
+
+Admin sign-in allows 5 attempts per client per 15 minutes; the status endpoint
+allows 20 per minute. Both go through the same in-process limiter the rest of
+the application uses — it stops one client hammering an endpoint, it is **not**
+distributed, and several instances each hold their own count. `checkRateLimit`
+is the seam a shared store would replace.
+
+### Production notes
+
+- Serve the panel over HTTPS. The session cookie is `Secure` in production, so
+  it will not be sent over plain HTTP anywhere but localhost.
+- Create administrators with the bootstrap script, from a shell with the
+  database credentials — never by editing rows by hand, and never by
+  committing a password.
+- Withdraw access by setting `isActive = false` and revoking the sessions;
+  the row stays so the audit trail keeps pointing at a name.
+- There is no password change, no password reset and no second factor in the
+  panel yet. Until there is, an admin password can only be rotated by somebody
+  with database access.
+- The rate limiter is per instance. Behind several instances, put a shared
+  limiter in front of `/api/admin/*` or replace `checkRateLimit`.
+
+### Tests
+
+```bash
+# rules that need no database: transitions, query parsing, links, bootstrap
+node --import ./register.mjs --test admin-unit.test.mjs
+
+# accounts, sessions, order queries, status changes and the audit trail
+DATABASE_URL=... node --import ./register.mjs --test admin-db.test.mjs
+
+# endpoints and pages over HTTP against a production build
+node --test admin-http.test.mjs
+
+# the journey in a browser, plus what must not work
+node admin-browser.mjs
+
+# accessibility, and 320-1920px in both themes
+node admin-a11y.mjs
+```
+
+### Not implemented in this step
+
+Product and catalogue management, supplier or fulfilment integration, shipping
+carriers, issuing refunds, coupons, customer impersonation, marketing,
+analytics, inventory, seller accounts, an admin role-management UI, admin
+password change or reset, email verification and two-factor authentication.
+The panel says so where an operator might look for them, rather than showing a
+control that does nothing.
 
 ## Payments (Stripe)
 

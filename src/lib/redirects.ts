@@ -46,3 +46,26 @@ export function safeNextPath(
     return fallback;
   }
 }
+
+/** Where an operator lands after signing in, when nothing else is asked for. */
+export const DEFAULT_AFTER_ADMIN_LOGIN = "/admin";
+
+/**
+ * The same guard, narrowed to the operations panel.
+ *
+ * An admin sign-in must not become a way to bounce somebody to an arbitrary
+ * storefront path, so on top of "a path on this site" the destination has to
+ * be inside `/admin` — and not the sign-in page itself, which would loop.
+ */
+export function safeAdminPath(
+  value: string | null | undefined,
+  fallback: string = DEFAULT_AFTER_ADMIN_LOGIN,
+): string {
+  const path = safeNextPath(value, fallback);
+  const pathname = path.split("?")[0] ?? "";
+  if (pathname !== "/admin" && !pathname.startsWith("/admin/")) {
+    return fallback;
+  }
+  // Sending an operator back to the sign-in page they just used would loop.
+  return pathname === "/admin/login" ? fallback : path;
+}

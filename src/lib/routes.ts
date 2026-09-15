@@ -68,3 +68,80 @@ export function registerHref(next?: string): string {
 export function categoryHref(category: string): string {
   return `/shop?category=${encodeURIComponent(category)}`;
 }
+
+/* -------------------------------------------------------------------------
+ * Internal operations
+ *
+ * The admin panel's own paths. Kept here with the rest so nothing hard-codes
+ * "/admin/..." in a component, and so the storefront's own helpers stay
+ * clearly separate from it.
+ * ---------------------------------------------------------------------- */
+
+/** The operations dashboard. */
+export function adminHref(): string {
+  return "/admin";
+}
+
+/**
+ * Admin sign-in, optionally remembering where the operator was heading.
+ *
+ * The `next` value is validated again when it is used, so a crafted link
+ * cannot turn this into an open redirect.
+ */
+export function adminLoginHref(next?: string): string {
+  return next ? `/admin/login?next=${encodeURIComponent(next)}` : "/admin/login";
+}
+
+/** Longest order-search term kept; longer input is truncated, never rejected. */
+export const MAX_ORDER_SEARCH_LENGTH = 120;
+
+export interface AdminOrdersHrefOptions {
+  status?: string | null;
+  paymentStatus?: string | null;
+  search?: string;
+  cursor?: string | null;
+  direction?: "older" | "newer";
+}
+
+/**
+ * The order list, with its filters, search term and page cursor.
+ *
+ * Every narrowing of the list is in the URL, so a filtered view is a link
+ * somebody can send to a colleague. Paging is dropped whenever a filter
+ * changes — page three of one filtered set says nothing about another — so
+ * the caller passes a cursor only when it means to keep it.
+ *
+ * Lives here rather than beside the parser because the filter controls are a
+ * client component: this file has no server imports, so linking costs the
+ * browser nothing.
+ */
+export function adminOrdersHref(options: AdminOrdersHrefOptions = {}): string {
+  const params = new URLSearchParams();
+  if (options.status) {
+    params.set("status", options.status);
+  }
+  if (options.paymentStatus) {
+    params.set("payment", options.paymentStatus);
+  }
+  if (options.search) {
+    params.set("q", options.search.slice(0, MAX_ORDER_SEARCH_LENGTH));
+  }
+  if (options.cursor) {
+    params.set("cursor", options.cursor);
+    if (options.direction) {
+      params.set("direction", options.direction);
+    }
+  }
+  const query = params.toString();
+  return query ? `/admin/orders?${query}` : "/admin/orders";
+}
+
+/** One order in the panel, addressed by its public reference. */
+export function adminOrderHref(reference: string): string {
+  return `/admin/orders/${encodeURIComponent(reference)}`;
+}
+
+/** The operator's own profile. */
+export function adminAccountHref(): string {
+  return "/admin/account";
+}

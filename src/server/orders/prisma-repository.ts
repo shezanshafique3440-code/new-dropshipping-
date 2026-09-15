@@ -74,11 +74,15 @@ function isUniqueViolation(error: unknown, field?: string): boolean {
   return parts.some((part) => part.includes(field));
 }
 
-const orderWithItems = {
+/**
+ * The include every order read uses. Exported so the admin repository reads
+ * orders in exactly the same shape rather than assembling its own.
+ */
+export const orderWithItems = {
   items: { orderBy: { createdAt: "asc" } },
 } as const;
 
-type OrderRow = Prisma.OrderGetPayload<{ include: typeof orderWithItems }>;
+export type OrderRow = Prisma.OrderGetPayload<{ include: typeof orderWithItems }>;
 
 export class PrismaOrderRepository implements OrderRepository {
   private readonly prisma: PrismaClient;
@@ -431,7 +435,7 @@ function describeError(error: unknown): string {
  * be renamed without touching a route.
  * ---------------------------------------------------------------------- */
 
-function toDomainOrder(row: OrderRow): Order {
+export function toDomainOrder(row: OrderRow): Order {
   return {
     id: row.id,
     reference: row.reference,

@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
+import { AppMain } from "@/components/layout/AppMain";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import { CartProvider } from "@/components/cart/CartProvider";
 import { Footer } from "@/components/layout/Footer";
-import { SiteChrome } from "@/components/layout/SiteChrome";
+import { ADMIN_ROUTES, SiteChrome } from "@/components/layout/SiteChrome";
 import { Header } from "@/components/layout/Header";
 import { siteConfig } from "@/config/site";
 import "@/styles/globals.css";
@@ -68,13 +69,16 @@ export default function RootLayout({
           <SiteChrome>
             <Header />
           </SiteChrome>
-          <main id="main-content" className="flex-1">
-            {children}
-          </main>
+          <AppMain>{children}</AppMain>
           <SiteChrome>
             <Footer />
           </SiteChrome>
-          <CartDrawer />
+          {/* The cart is storefront furniture; the operations panel has no
+              cart and should not carry its markup. Checkout keeps it: the
+              drawer is still how a shopper edits their basket there. */}
+          <SiteChrome hiddenOn={ADMIN_ROUTES}>
+            <CartDrawer />
+          </SiteChrome>
         </CartProvider>
       </body>
     </html>

@@ -578,6 +578,22 @@
   letter-spacing: -0.016em;
 }
 
+/* Two steps below h3, for dense screens — the operations panel stacks several
+   section headings in one column, where the storefront's h3 would shout. */
+@utility type-h4 {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.012em;
+}
+
+@utility type-h5 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.006em;
+}
+
 @utility type-body-lg {
   font-size: clamp(1.0625rem, 1.02rem + 0.2vw, 1.1875rem);
   font-weight: 400;

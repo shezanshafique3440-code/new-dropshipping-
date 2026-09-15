@@ -139,3 +139,60 @@ export function isAwaitingPayment(state: OrderState): boolean {
 export function isSettled(state: OrderState): boolean {
   return state.paymentStatus === "paid" || state.paymentStatus === "refunded";
 }
+
+/* -------------------------------------------------------------------------
+ * Operational transitions
+ *
+ * What an administrator may do to an order, as opposed to what the payment
+ * provider's lifecycle does to it.
+ * ---------------------------------------------------------------------- */
+
+export const ORDER_STATUSES: readonly OrderStatus[] = [
+  "pending",
+  "paid",
+  "cancelled",
+  "failed",
+];
+
+/**
+ * The statuses an operator may set by hand.
+ *
+ * Cancelling is the whole list, and deliberately so. `paid` and `failed` are
+ * statements about money, and money is Stripe's to report: a "mark as paid"
+ * control would let the order table disagree with the payment provider, which
+ * is exactly the inconsistency the two-field model exists to prevent.
+ */
+const ADMIN_INITIABLE: readonly OrderStatus[] = ["cancelled"];
+
+/**
+ * Which of those an order in this state can actually move to.
+ *
+ * The payment status is held fixed while asking, so the existing state
+ * machine — not a second rule written for the admin panel — decides. A
+ * target that would require the money to have moved fails `canTransition`
+ * and never appears as an option. A cancelled order returns nothing:
+ * cancellation is terminal, and the admin panel does not widen that.
+ */
+export function adminStatusOptions(state: OrderState): readonly OrderStatus[] {
+  return ADMIN_INITIABLE.filter(
+    (status) =>
+      status !== state.status &&
+      canTransition(state, { status, paymentStatus: state.paymentStatus }),
+  );
+}
+
+/** True when an operator may move this order to that status. */
+export function isAdminStatusChangeAllowed(
+  state: OrderState,
+  target: OrderStatus,
+): boolean {
+  return adminStatusOptions(state).includes(target);
+}
+
+/** Narrows arbitrary input to an order status. Returns null for anything else. */
+export function parseOrderStatus(value: unknown): OrderStatus | null {
+  return typeof value === "string" &&
+    (ORDER_STATUSES as readonly string[]).includes(value)
+    ? (value as OrderStatus)
+    : null;
+}

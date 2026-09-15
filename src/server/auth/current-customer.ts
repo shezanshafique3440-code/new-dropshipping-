@@ -3,11 +3,7 @@ import { redirect } from "next/navigation";
 import { loginHref } from "@/lib/routes";
 
 import { findCustomerById, type CustomerRecord } from "./customers";
-import {
-  clearSessionCookie,
-  readSessionCookie,
-  resolveSession,
-} from "./sessions";
+import { readSessionCookie, resolveSession } from "./sessions";
 
 /**
  * Who is making this request.
@@ -26,8 +22,12 @@ export interface AuthenticatedContext {
 /**
  * The signed-in customer, or null.
  *
- * A cookie that no longer resolves — revoked, expired, or simply unknown — is
- * cleared on the way past, so a stale value cannot keep being presented.
+ * Read-only. A cookie that no longer resolves — revoked, expired, or simply
+ * unknown — is not honoured, and is left alone rather than cleared: Next.js
+ * refuses a cookie write during a render, and attempting one turns the
+ * redirect to sign-in into a render error instead. The cookie is written
+ * where that is allowed, in the sign-in and sign-out route handlers, and a
+ * stale value resolves to nobody until then.
  */
 export async function getCurrentCustomer(): Promise<AuthenticatedContext | null> {
   const token = await readSessionCookie();
@@ -37,14 +37,11 @@ export async function getCurrentCustomer(): Promise<AuthenticatedContext | null>
 
   const session = await resolveSession(token);
   if (!session) {
-    await clearSessionCookie();
     return null;
   }
 
   const customer = await findCustomerById(session.customerId);
   if (!customer) {
-    // The account is gone but the cookie is not. Tidy up.
-    await clearSessionCookie();
     return null;
   }
 

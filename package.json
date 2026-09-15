@@ -2,7 +2,7 @@
   "name": "zyvero-storefront",
   "version": "0.1.0",
   "private": true,
-  "description": "ZYVERO — a premium international storefront built with Next.js, TypeScript and Tailwind CSS.",
+  "description": "ZYVERO \u2014 a premium international storefront built with Next.js, TypeScript and Tailwind CSS.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -11,6 +11,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:status": "prisma migrate status",
+    "admin:bootstrap": "node --import ./scripts/ts-resolve.mjs scripts/bootstrap-admin.mjs",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "typecheck": "tsc --noEmit",
