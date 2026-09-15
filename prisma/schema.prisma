@@ -332,3 +332,100 @@ model OrderStatusHistory {
   @@index([createdAt])
   @@map("order_status_history")
 }
+
+/**
+ * ---------------------------------------------------------------------------
+ * Catalogue
+ * The products the shop sells. Until this point the catalogue was a TypeScript
+ * module; it is now a table, and the storefront reads published rows from it.
+ * Two things are deliberately *not* here. Prices are integers in minor units,
+ * like every other amount in this schema — a price is money and money is never
+ * a float. And nothing in `order_items` points at this table: an order records
+ * what was bought and charged at the time, so editing, unpublishing, archiving
+ * or deleting a product can never change what an old order says.
+ * ------------------------------------------------------------------------
+ */
+
+/// Where a product is in its own lifecycle.
+///
+/// Lowercase to match `OrderStatus` and `PaymentStatus` above. Only
+/// `published` is ever visible to a shopper; `archived` is how a product
+/// leaves the shop, because deleting one would be a worse answer.
+enum ProductStatus {
+  draft
+  published
+  archived
+}
+
+model Product {
+  /// Internal identifier.
+  ///
+  /// Not a uuid: these ids are the ones already written into `order_items`
+  /// and into Stripe session metadata by every order placed so far, so they
+  /// stay stable, readable slugs-of-record (`aeropulse-headphones`).
+  id String @id @db.VarChar(120)
+
+  /// URL segment: `/shop/<slug>`. Immutable once created — see the README.
+  slug String @unique @db.VarChar(160)
+
+  name             String  @db.VarChar(200)
+  /// One or two sentences. Used on the detail page and by search.
+  description      String  @db.VarChar(2000)
+  /// Optional one-liner for cards and metadata.
+  shortDescription String? @db.VarChar(300)
+
+  /// One of the six categories in `src/lib/product-categories.ts`, enforced by
+  /// a CHECK constraint rather than a Prisma enum so there is exactly one
+  /// authoritative list, in TypeScript, shared by the database, the admin
+  /// form and the storefront filters.
+  category String @db.VarChar(40)
+
+  /// Selling points listed on the detail page.
+  features String[] @db.VarChar(200)
+
+  /// Minor units (cents). Never a float, anywhere.
+  priceAmount          Int
+  /// Original price, struck through when present. Never below `priceAmount`.
+  compareAtPriceAmount Int?
+  /// ISO 4217, lowercase to match Stripe and the orders table.
+  currency             String @db.VarChar(3)
+
+  status     ProductStatus @default(draft)
+  /// Hand-picked for the homepage grid and the default catalogue order.
+  featured   Boolean       @default(false)
+  /// Merchandising flags. Separate columns rather than an array, so each can
+  /// be filtered and indexed, and so the admin form is a set of switches.
+  bestseller Boolean       @default(false)
+  trending   Boolean       @default(false)
+  newArrival Boolean       @default(false)
+
+  /// Catalogue position, lowest first. Replaces the mock data's `addedRank`.
+  sortOrder Int @default(0)
+
+  /// Which built-in illustration and colour family the card draws. A key into
+  /// the artwork component, never an image blob: the database references the
+  /// visual identity, it does not store it.
+  artKey String @db.VarChar(40)
+  tone   String @db.VarChar(20)
+
+  /// Merchandising pill, e.g. "Popular". Both halves or neither.
+  badgeLabel String? @db.VarChar(40)
+  badgeTone  String? @db.VarChar(20)
+
+  /// Demo rating. Stored in tenths (48 = 4.8) so it is an exact integer.
+  ratingValue Int?
+  ratingCount Int?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  /// The storefront reads published products, ordered for the catalogue; the
+  /// admin list filters by status and category and orders by recency. These
+  /// are those queries, and nothing more speculative.
+  @@index([status, sortOrder])
+  @@index([status, category])
+  @@index([status, featured])
+  @@index([status, bestseller])
+  @@index([updatedAt(sort: Desc)])
+  @@map("products")
+}

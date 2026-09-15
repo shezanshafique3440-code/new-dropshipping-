@@ -1,4 +1,3 @@
-import { priceBounds, products } from "@/data/mock-storefront";
 import { productHref } from "@/lib/routes";
 import {
   PRODUCT_CATEGORIES,
@@ -11,49 +10,65 @@ import {
   type SortValue,
 } from "@/types";
 
+/**
+ * Catalogue filtering, sorting and URL state.
+ *
+ * Pure, and free of data imports on purpose: the products now come from
+ * PostgreSQL, fetched by a server component, and this module only decides
+ * what to do with a list it is handed. That keeps the same functions usable
+ * by the server render and by the client component that owns the filter state
+ * afterwards, without either of them being able to reach the database.
+ *
+ * The price range is passed in rather than imported, for the same reason: it
+ * is the real minimum and maximum of the published catalogue, read once on
+ * the server.
+ */
+
 export { productHref };
 
-export function findProductBySlug(slug: string): Product | undefined {
-  return products.find((product) => product.slug === slug);
+/** Lowest and highest published price, in major units. */
+export interface PriceBounds {
+  min: number;
+  max: number;
 }
 
-/**
- * Authoritative product lookup by id.
- *
- * The payment layer resolves every basket line through this, so a price only
- * ever comes from the catalogue — never from the browser. When the catalogue
- * moves to a database or supplier feed, this stays the single seam.
- */
-export function findProductById(id: string): Product | undefined {
-  return products.find((product) => product.id === id);
-}
+/** A range wide enough to hold anything, for a catalogue with no products. */
+export const EMPTY_PRICE_BOUNDS: PriceBounds = { min: 0, max: 0 };
 
-export const defaultFilters: CatalogFilters = {
-  query: "",
-  category: "all",
-  tags: [],
-  minPrice: priceBounds.min,
-  maxPrice: priceBounds.max,
-  sort: "featured",
-};
+export function defaultFilters(bounds: PriceBounds): CatalogFilters {
+  return {
+    query: "",
+    category: "all",
+    tags: [],
+    minPrice: bounds.min,
+    maxPrice: bounds.max,
+    sort: "featured",
+  };
+}
 
 /** True when nothing has been narrowed from the default catalogue view. */
-export function isDefaultFilters(filters: CatalogFilters): boolean {
+export function isDefaultFilters(
+  filters: CatalogFilters,
+  bounds: PriceBounds,
+): boolean {
   return (
     filters.query.trim() === "" &&
     filters.category === "all" &&
     filters.tags.length === 0 &&
-    filters.minPrice <= priceBounds.min &&
-    filters.maxPrice >= priceBounds.max
+    filters.minPrice <= bounds.min &&
+    filters.maxPrice >= bounds.max
   );
 }
 
 /** Number of narrowing filters in effect, for the mobile drawer badge. */
-export function countActiveFilters(filters: CatalogFilters): number {
+export function countActiveFilters(
+  filters: CatalogFilters,
+  bounds: PriceBounds,
+): number {
   let count = 0;
   if (filters.category !== "all") count += 1;
   count += filters.tags.length;
-  if (filters.minPrice > priceBounds.min || filters.maxPrice < priceBounds.max) {
+  if (filters.minPrice > bounds.min || filters.maxPrice < bounds.max) {
     count += 1;
   }
   return count;
@@ -101,7 +116,7 @@ const comparators: Record<SortValue, (a: Product, b: Product) => number> = {
 /** Applies every filter, then sorts. Pure — safe to call on the server. */
 export function filterProducts(
   filters: CatalogFilters,
-  source: readonly Product[] = products,
+  source: readonly Product[],
 ): Product[] {
   const result = source.filter(
     (product) =>
@@ -122,8 +137,12 @@ export function filterProducts(
  * Related products for a detail page: same category first, then products
  * sharing a merchandising tag, then featured. Deterministic.
  */
-export function getRelatedProducts(product: Product, limit = 4): Product[] {
-  const pool = products.filter((item) => item.id !== product.id);
+export function getRelatedProducts(
+  product: Product,
+  catalogue: readonly Product[],
+  limit = 4,
+): Product[] {
+  const pool = catalogue.filter((item) => item.id !== product.id);
   const score = (candidate: Product): number => {
     if (candidate.category === product.category) return 0;
     if (candidate.tags.some((tag) => product.tags.includes(tag))) return 1;
@@ -159,7 +178,10 @@ function readPrice(
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-export function parseFilters(params: RawSearchParams): CatalogFilters {
+export function parseFilters(
+  params: RawSearchParams,
+  bounds: PriceBounds,
+): CatalogFilters {
   const category = readOne(params, "category");
   const sort = readOne(params, "sort");
   const tags = (readOne(params, "tags") ?? "")
@@ -168,14 +190,8 @@ export function parseFilters(params: RawSearchParams): CatalogFilters {
       (PRODUCT_TAGS as readonly string[]).includes(tag),
     );
 
-  const min = Math.max(
-    priceBounds.min,
-    readPrice(readOne(params, "min"), priceBounds.min),
-  );
-  const max = Math.min(
-    priceBounds.max,
-    readPrice(readOne(params, "max"), priceBounds.max),
-  );
+  const min = Math.max(bounds.min, readPrice(readOne(params, "min"), bounds.min));
+  const max = Math.min(bounds.max, readPrice(readOne(params, "max"), bounds.max));
 
   return {
     query: readOne(params, "q") ?? "",
@@ -195,15 +211,18 @@ export function parseFilters(params: RawSearchParams): CatalogFilters {
 }
 
 /** Serialises filters back to a query string, omitting defaults. */
-export function filtersToSearchParams(filters: CatalogFilters): string {
+export function filtersToSearchParams(
+  filters: CatalogFilters,
+  bounds: PriceBounds,
+): string {
   const params = new URLSearchParams();
   if (filters.query.trim()) params.set("q", filters.query.trim());
   if (filters.category !== "all") params.set("category", filters.category);
   if (filters.tags.length) params.set("tags", filters.tags.join(","));
-  if (filters.minPrice > priceBounds.min) {
+  if (filters.minPrice > bounds.min) {
     params.set("min", String(filters.minPrice));
   }
-  if (filters.maxPrice < priceBounds.max) {
+  if (filters.maxPrice < bounds.max) {
     params.set("max", String(filters.maxPrice));
   }
   if (filters.sort !== "featured") params.set("sort", filters.sort);

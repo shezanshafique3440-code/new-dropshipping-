@@ -1,7 +1,7 @@
 import type {
   Category,
   CommunityTile,
-  Product,
+  SeedProduct,
   Testimonial,
   TrustItem,
   ValueProp,
@@ -12,13 +12,20 @@ import type {
  *
  * Everything here is fictional placeholder data used to build and review the
  * store. Products, prices, ratings and testimonials are NOT real, and nothing
- * is stocked. The exported shapes match `@/types`, so a database, CMS or
- * supplier feed can replace this module later without touching a component.
+ * is stocked.
  *
- * `addedRank` stands in for a `createdAt` timestamp: 1 is the most recently
- * added product. Swap it for a real date column when one exists.
+ * The products below are now **seed data**: `npm run db:seed` writes them into
+ * the `products` table, and the storefront reads that table. Editing this file
+ * changes what a fresh database starts with, not what the running shop shows.
+ * Prices are written the way a person writes them (79.99) and converted to
+ * integer minor units exactly once, by the seed script.
+ *
+ * The rest — categories' taglines and artwork, testimonials, trust items,
+ * community tiles — is presentation content that has no database table yet.
+ *
+ * `addedRank` becomes the product's `sortOrder`: lower sorts first.
  */
-export const products: readonly Product[] = [
+export const products: readonly SeedProduct[] = [
   // ---------------------------------------------------------------- Tech
   {
     id: "aeropulse-headphones",
@@ -679,7 +686,7 @@ export const products: readonly Product[] = [
 ];
 
 /** Fails at module load if an id is ever renamed without updating a caller. */
-function requireProduct(id: string): Product {
+function requireProduct(id: string): SeedProduct {
   const product = products.find((item) => item.id === id);
   if (!product) {
     throw new Error(`Unknown product id: ${id}`);
@@ -687,8 +694,16 @@ function requireProduct(id: string): Product {
   return product;
 }
 
+/**
+ * Derived collections.
+ *
+ * These were what the homepage read before the catalogue moved to PostgreSQL.
+ * They stay because the seed uses them to set each product's flags, and
+ * because the hero composition names the three products it wants. Nothing at
+ * runtime reads them — the homepage queries the database.
+ */
 /** Products marked for the homepage's "Featured Finds" grid. */
-export const featuredProducts: readonly Product[] = products.filter(
+export const featuredProducts: readonly SeedProduct[] = products.filter(
   (product) => product.featured,
 );
 
@@ -696,12 +711,12 @@ export const featuredProducts: readonly Product[] = products.filter(
  * Six best sellers for the homepage, excluding anything already shown in
  * "Featured Finds" so the same product never appears twice on one page.
  */
-export const bestSellers: readonly Product[] = products
+export const bestSellers: readonly SeedProduct[] = products
   .filter((product) => product.tags.includes("bestSeller") && !product.featured)
   .slice(0, 6);
 
 /** Products floating in the homepage hero composition. */
-export const heroProducts: readonly Product[] = [
+export const heroProducts: readonly SeedProduct[] = [
   requireProduct("novaglow-lamp"),
   requireProduct("aeropulse-headphones"),
   requireProduct("orbit-mini-speaker"),

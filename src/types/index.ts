@@ -135,17 +135,21 @@ export const PRODUCT_ART_KEYS = [
 
 export type ProductArtKey = (typeof PRODUCT_ART_KEYS)[number];
 
-/** The catalogue's top-level categories. */
-export const PRODUCT_CATEGORIES = [
-  "Tech",
-  "Home",
-  "Lifestyle",
-  "Beauty",
-  "Accessories",
-  "Everyday Essentials",
-] as const;
+/**
+ * The catalogue's top-level categories.
+ *
+ * Defined once in `@/lib/product-categories` — the same array the database's
+ * CHECK constraint mirrors — and re-exported here so the shapes below, and
+ * every existing import, keep reading naturally.
+ */
+import type { ProductCategory } from "@/lib/product-categories";
 
-export type ProductCategory = (typeof PRODUCT_CATEGORIES)[number];
+export {
+  PRODUCT_CATEGORIES,
+  isProductCategory,
+  categoryKey,
+} from "@/lib/product-categories";
+export type { ProductCategory };
 
 /** Merchandising flags a shopper can filter by. */
 export const PRODUCT_TAGS = ["bestSeller", "newArrival", "trending"] as const;
@@ -194,9 +198,23 @@ export interface Product {
   description: string;
   /** Short selling points listed on the detail page. */
   features: readonly string[];
+  /**
+   * Display price in major units (19.99). Derived from `priceAmount` — never
+   * the other way round, and never what a payment is based on.
+   */
   price: number;
+  /**
+   * The authoritative price, in minor units (1999). This is what the checkout
+   * charges: the major-unit figure above exists so components can format it,
+   * and no float is ever multiplied to reach a total.
+   */
+  priceAmount: number;
   /** Original price, shown struck through when present. */
   compareAtPrice?: number;
+  /** The same, in minor units. */
+  compareAtPriceAmount?: number;
+  /** ISO 4217, lowercase. */
+  currency: string;
   badge?: ProductBadge;
   rating?: ProductRating;
   /** Merchandising flags, also used by the "Featured" sort. */
@@ -210,6 +228,20 @@ export interface Product {
   addedRank: number;
   art: ProductArtKey;
   tone: ArtTone;
+}
+
+/**
+ * A product as the seed data authors it.
+ *
+ * The same shape as {@link Product} minus the fields the database owns: the
+ * price is written the way a person writes a price (79.99) and the seed
+ * script converts it to minor units exactly once, on its way into the table.
+ * Nothing at runtime reads this shape — it exists so the seed file can stay
+ * readable and still be type-checked.
+ */
+export interface SeedProduct
+  extends Omit<Product, "priceAmount" | "compareAtPriceAmount" | "currency"> {
+  compareAtPrice?: number;
 }
 
 /* -------------------------------------------------------------------------
@@ -464,12 +496,13 @@ export type CategoryArtKey =
 
 export interface Category {
   id: string;
-  name: string;
+  /** One of the catalogue's categories — the same list the products use. */
+  name: ProductCategory;
   tagline: string;
   href: string;
   art: CategoryArtKey;
   tone: ArtTone;
-  /** Demo count shown as a hint of catalogue depth. */
+  /** Published products in this category, counted by the database. */
   itemCount: number;
 }
 

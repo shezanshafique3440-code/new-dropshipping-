@@ -10,12 +10,11 @@ import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Container } from "@/components/ui/Container";
 import { Icon, type IconName } from "@/components/ui/Icon";
-import { products } from "@/data/mock-storefront";
+import { getRelatedProducts, productHref } from "@/lib/catalog";
 import {
-  findProductBySlug,
-  getRelatedProducts,
-  productHref,
-} from "@/lib/catalog";
+  findPublishedProduct,
+  listCatalogue,
+} from "@/server/catalog/service";
 import { formatPrice } from "@/lib/format";
 import { siteConfig } from "@/config/site";
 import type { ProductBadgeTone } from "@/types";
@@ -52,16 +51,22 @@ const infoCards: ReadonlyArray<{
 ];
 
 /**
- * The catalogue is fully known at build time, so every product page is
- * prerendered and any other slug is a genuine 404. Without this, Next renders
- * unknown slugs on demand and `notFound()` is served with a 200 — a soft 404
- * that search engines would index.
+ * Rendered per request.
+ *
+ * The catalogue used to be known at build time, so these pages were
+ * prerendered with `generateStaticParams` and `dynamicParams = false`, which
+ * made an unknown slug a real 404. It is a database table now: an operator
+ * can publish a product, change a price or archive something at any moment,
+ * and a page built an hour ago would be wrong about all three.
+ *
+ * The trade-off is the status code. Next begins streaming before this page
+ * has finished, so `notFound()` renders the not-found UI inside a response
+ * that has already committed a 200 — a soft 404. Next injects
+ * `<meta name="robots" content="noindex">` with it, which is what keeps it
+ * out of search results, and no product data is rendered either way. See the
+ * framework's own note under `notFound()` → Status codes.
  */
-export const dynamicParams = false;
-
-export function generateStaticParams() {
-  return products.map((product) => ({ slug: product.slug }));
-}
+export const dynamic = "force-dynamic";
 
 export interface ProductPageProps {
   params: Promise<{ slug: string }>;
@@ -71,7 +76,7 @@ export async function generateMetadata({
   params,
 }: ProductPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const product = findProductBySlug(slug);
+  const product = await findPublishedProduct(slug);
 
   if (!product) {
     return { title: "Product not found" };
@@ -93,13 +98,16 @@ export async function generateMetadata({
 
 export default async function ProductPage({ params }: ProductPageProps) {
   const { slug } = await params;
-  const product = findProductBySlug(slug);
+  // Published only. A draft, an archived product and a slug that never
+  // existed are one answer — a 404 — so the panel's unfinished work is not
+  // discoverable by guessing a URL.
+  const product = await findPublishedProduct(slug);
 
   if (!product) {
     notFound();
   }
 
-  const related = getRelatedProducts(product);
+  const related = getRelatedProducts(product, await listCatalogue());
   const discount =
     product.compareAtPrice === undefined
       ? undefined

@@ -145,3 +145,47 @@ export function adminOrderHref(reference: string): string {
 export function adminAccountHref(): string {
   return "/admin/account";
 }
+
+/** Longest product-search term kept. */
+export const MAX_PRODUCT_SEARCH_LENGTH = 120;
+
+export interface AdminProductsHrefOptions {
+  status?: string | null;
+  category?: string | null;
+  search?: string;
+  page?: number;
+}
+
+/**
+ * The product list, with its filters, search term and page.
+ *
+ * Offset paging rather than a cursor: the panel shows a total and lets an
+ * operator jump pages, and neither works with a keyset cursor.
+ */
+export function adminProductsHref(options: AdminProductsHrefOptions = {}): string {
+  const params = new URLSearchParams();
+  if (options.status) {
+    params.set("status", options.status);
+  }
+  if (options.category) {
+    params.set("category", options.category);
+  }
+  if (options.search) {
+    params.set("q", options.search.slice(0, MAX_PRODUCT_SEARCH_LENGTH));
+  }
+  if (options.page && options.page > 1) {
+    params.set("page", String(options.page));
+  }
+  const query = params.toString();
+  return query ? `/admin/products?${query}` : "/admin/products";
+}
+
+/** One product in the panel, addressed by its slug. */
+export function adminProductHref(slug: string): string {
+  return `/admin/products/${encodeURIComponent(slug)}`;
+}
+
+/** The new-product form. */
+export function adminNewProductHref(): string {
+  return "/admin/products/new";
+}

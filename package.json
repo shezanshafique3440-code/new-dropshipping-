@@ -11,6 +11,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:status": "prisma migrate status",
+    "db:seed": "node --import ./scripts/ts-resolve.mjs scripts/seed-products.mjs",
     "admin:bootstrap": "node --import ./scripts/ts-resolve.mjs scripts/bootstrap-admin.mjs",
     "lint": "eslint",
     "lint:fix": "eslint --fix",

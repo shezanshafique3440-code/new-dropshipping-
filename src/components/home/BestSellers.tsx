@@ -3,13 +3,22 @@ import { ProductCard } from "@/components/product/ProductCard";
 import { ButtonLink } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
 import { Icon } from "@/components/ui/Icon";
-import { bestSellers } from "@/data/mock-storefront";
+import type { Product } from "@/types";
+
+export interface BestSellersProps {
+  /** Published best sellers, read from the database. */
+  products: readonly Product[];
+}
 
 /**
  * Second product grid, with demo rating figures.
  * The ratings are placeholder numbers, not verified customer reviews.
  */
-export function BestSellers() {
+export function BestSellers({ products }: BestSellersProps) {
+  if (products.length === 0) {
+    return null;
+  }
+
   return (
     <section aria-labelledby="best-sellers-heading" className="section-y">
       <Container className="flex flex-col gap-10">
@@ -22,7 +31,7 @@ export function BestSellers() {
         />
 
         <ul className="reveal-stagger grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-3 xl:grid-cols-6">
-          {bestSellers.map((product) => (
+          {products.map((product) => (
             <li key={product.id} className="flex">
               <ProductCard product={product} showRating className="w-full" />
             </li>

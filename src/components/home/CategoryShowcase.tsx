@@ -6,7 +6,7 @@ import { Container } from "@/components/ui/Container";
 import { Icon } from "@/components/ui/Icon";
 import { categories } from "@/data/mock-storefront";
 import { cn } from "@/lib/utils";
-import type { Category } from "@/types";
+import type { Category, ProductCategory } from "@/types";
 
 function CategoryCard({
   category,
@@ -62,12 +62,25 @@ function CategoryCard({
   );
 }
 
+export interface CategoryShowcaseProps {
+  /** How many published products sit in each category, counted by PostgreSQL. */
+  counts: ReadonlyMap<ProductCategory, number>;
+}
+
 /**
  * Category grid with one tall featured tile and five supporting tiles, so the
  * section reads as an editorial layout rather than a uniform six-up grid.
+ *
+ * The taglines and artwork are presentation content with no table of their
+ * own; the count on each tile is the real number of published products in
+ * that category, so a tile never promises more than the shop has.
  */
-export function CategoryShowcase() {
-  const [featured, ...rest] = categories;
+export function CategoryShowcase({ counts }: CategoryShowcaseProps) {
+  const withCounts = categories.map((category) => ({
+    ...category,
+    itemCount: counts.get(category.name) ?? 0,
+  }));
+  const [featured, ...rest] = withCounts;
 
   return (
     <section

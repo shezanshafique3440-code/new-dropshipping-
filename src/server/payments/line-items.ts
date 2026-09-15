@@ -1,8 +1,7 @@
 import type Stripe from "stripe";
 
-import { findProductById } from "@/lib/catalog";
 import { lineAmount, sumMinorUnits } from "@/lib/money";
-import type { OrderItem } from "@/types";
+import type { OrderItem, Product } from "@/types";
 
 import { PAYMENT_CURRENCY } from "./config";
 import type { TrustedLine } from "./checkout-request";
@@ -120,13 +119,22 @@ export function decodeCartMetadata(
 /**
  * Expands decoded lines into order items.
  *
- * Amounts come from the session (what was charged); names and slugs come from
- * the catalogue, falling back to the recorded id if a product has since been
- * withdrawn, so a paid order is never lost to a catalogue edit.
+ * Amounts come from the session — what was actually charged — and are never
+ * re-read from the catalogue: that is what keeps a paid order correct after a
+ * price change. Names and slugs are copied from the catalogue *once*, here,
+ * at the moment the order is written, and fall back to the recorded id if the
+ * product has since been withdrawn. After this point the snapshot is the
+ * record, and nothing rewrites it.
+ *
+ * The catalogue map is passed in (and includes unpublished products, since
+ * the money has already moved) so this stays one query per order.
  */
-export function toOrderItems(lines: readonly DecodedLine[]): readonly OrderItem[] {
+export function toOrderItems(
+  lines: readonly DecodedLine[],
+  catalogue: ReadonlyMap<string, Product>,
+): readonly OrderItem[] {
   return lines.map((line) => {
-    const product = findProductById(line.productId);
+    const product = catalogue.get(line.productId);
     return {
       productId: line.productId,
       slug: product?.slug ?? line.productId,

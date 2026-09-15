@@ -1,5 +1,7 @@
 import type { Order } from "@/types";
 
+import { findProductsForRecord } from "../catalog/service";
+
 import {
   toCustomerOrderDetail,
   toCustomerOrderSummary,
@@ -192,7 +194,14 @@ export async function listCustomerOrders(
     direction,
   });
 
-  const orders = page.orders.map(toCustomerOrderSummary);
+  // Artwork for every product the page mentions, in one query rather than one
+  // per order. Missing products simply draw a placeholder.
+  const catalogue = await findProductsForRecord(
+    page.orders.flatMap((order) => order.items.map((item) => item.productId)),
+  );
+  const orders = page.orders.map((order) =>
+    toCustomerOrderSummary(order, catalogue),
+  );
   const first = page.orders[0];
   const last = page.orders[page.orders.length - 1];
 
@@ -214,7 +223,13 @@ export async function getCustomerOrder(
   options: OrderServiceOptions = {},
 ): Promise<CustomerOrderDetailView | null> {
   const order = await repo(options).findForCustomer(customerId, reference);
-  return order ? toCustomerOrderDetail(order) : null;
+  if (!order) {
+    return null;
+  }
+  const catalogue = await findProductsForRecord(
+    order.items.map((item) => item.productId),
+  );
+  return toCustomerOrderDetail(order, catalogue);
 }
 
 function edge(order: Order): OrderPageCursor {

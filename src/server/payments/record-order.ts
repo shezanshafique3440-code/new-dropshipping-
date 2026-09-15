@@ -1,7 +1,8 @@
 import type Stripe from "stripe";
 
-import type { Order, OrderShippingAddress } from "@/types";
+import type { Order, OrderShippingAddress, Product } from "@/types";
 
+import { findProductsForRecord } from "../catalog/service";
 import type { NewOrder } from "../orders/repository";
 import {
   findOrderByCheckoutSession,
@@ -27,9 +28,24 @@ export type RecordOutcome =
   | { kind: "recorded"; order: Order; created: boolean }
   | { kind: "ignored"; reason: string };
 
+/**
+ * How an order's line names are resolved.
+ *
+ * Injected, like the checkout parser's price lookup, so this function works
+ * against whatever catalogue it is given — the database in the application, a
+ * fixture in a test — instead of reaching for one itself.
+ */
+export type RecordCatalogueLookup = (
+  ids: readonly string[],
+) => Promise<ReadonlyMap<string, Product>>;
+
+export interface RecordOrderOptions extends OrderServiceOptions {
+  catalogue?: RecordCatalogueLookup;
+}
+
 export async function recordOrderForSession(
   session: Stripe.Checkout.Session,
-  options?: OrderServiceOptions,
+  options?: RecordOrderOptions,
 ): Promise<RecordOutcome> {
   if (!session.id) {
     return { kind: "ignored", reason: "session-without-id" };
@@ -61,7 +77,10 @@ export async function recordOrderForSession(
     return { kind: "recorded", order: existing, created: false };
   }
 
-  const { order, created } = await recordOrder(buildDraft(session, paid), options);
+  const { order, created } = await recordOrder(
+    await buildDraft(session, paid, options?.catalogue ?? findProductsForRecord),
+    options,
+  );
 
   // Someone else created it between the lookup and the insert, and the
   // repository handed us theirs. If theirs is not yet paid but this call
@@ -78,9 +97,19 @@ export async function recordOrderForSession(
   return { kind: "recorded", order, created };
 }
 
-function buildDraft(session: Stripe.Checkout.Session, paid: boolean): NewOrder {
+async function buildDraft(
+  session: Stripe.Checkout.Session,
+  paid: boolean,
+  lookup: RecordCatalogueLookup,
+): Promise<NewOrder> {
   const decoded = decodeCartMetadata(session.metadata);
-  const items = decoded ? toOrderItems(decoded) : [];
+  // Names and slugs are copied from the catalogue once, here. The lookup
+  // deliberately ignores status: the money has moved, so an archived product
+  // must still contribute its name rather than leave a line reading as an id.
+  const catalogue = decoded
+    ? await lookup(decoded.map((line) => line.productId))
+    : new Map<string, Product>();
+  const items = decoded ? toOrderItems(decoded, catalogue) : [];
 
   if (!decoded) {
     // Money may already have moved, so the order is still recorded — losing it

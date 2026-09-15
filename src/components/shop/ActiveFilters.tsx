@@ -1,6 +1,6 @@
 "use client";
 
-import { priceBounds } from "@/data/mock-storefront";
+import type { PriceBounds } from "@/lib/catalog";
 import { formatPrice } from "@/lib/format";
 import { Icon } from "@/components/ui/Icon";
 import type { CatalogFilters, ProductTag } from "@/types";
@@ -13,6 +13,8 @@ const tagLabels: Record<ProductTag, string> = {
 
 export interface ActiveFiltersProps {
   filters: CatalogFilters;
+  /** The published catalogue's price range, read on the server. */
+  priceBounds: PriceBounds;
   onClearQuery: () => void;
   onClearCategory: () => void;
   onClearTag: (tag: ProductTag) => void;
@@ -44,6 +46,7 @@ function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
 /** Removable chips for every filter currently narrowing the catalogue. */
 export function ActiveFilters({
   filters,
+  priceBounds,
   onClearQuery,
   onClearCategory,
   onClearTag,

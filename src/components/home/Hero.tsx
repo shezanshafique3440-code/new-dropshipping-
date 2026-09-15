@@ -4,7 +4,6 @@ import { ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Container } from "@/components/ui/Container";
 import { Icon } from "@/components/ui/Icon";
-import { heroProducts } from "@/data/mock-storefront";
 import { formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/types";
@@ -44,8 +43,16 @@ function HeroTile({
  * product tiles on the right. The composition is a two-column grid rather than
  * absolutely-placed cards, so it keeps its shape from 320px up.
  */
-export function Hero() {
-  const [primary, secondary, tertiary] = heroProducts;
+export interface HeroProps {
+  /**
+   * Three published products for the composition. Fewer is fine — each tile
+   * simply does not render — so the hero survives a small catalogue.
+   */
+  products: readonly Product[];
+}
+
+export function Hero({ products }: HeroProps) {
+  const [primary, secondary, tertiary] = products;
 
   return (
     <section className="gradient-hero relative overflow-hidden">

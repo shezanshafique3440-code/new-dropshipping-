@@ -11,13 +11,13 @@ import { SearchField } from "@/components/shop/SearchField";
 import { SortSelect } from "@/components/shop/SortSelect";
 import { ProductCard } from "@/components/product/ProductCard";
 import { Container } from "@/components/ui/Container";
-import { priceBounds } from "@/data/mock-storefront";
 import {
   countActiveFilters,
   defaultFilters,
   filterProducts,
   filtersToSearchParams,
   isDefaultFilters,
+  type PriceBounds,
 } from "@/lib/catalog";
 import type {
   CatalogFilters,
@@ -32,6 +32,12 @@ export interface ShopCatalogProps {
   products: readonly Product[];
   /** Filter state parsed from the URL on the server, so SSR matches. */
   initialFilters: CatalogFilters;
+  /**
+   * The real price range of the published catalogue, read on the server.
+   * Passed in rather than imported so the slider always spans the products
+   * that actually exist.
+   */
+  priceBounds: PriceBounds;
 }
 
 /**
@@ -42,20 +48,24 @@ export interface ShopCatalogProps {
  * without a server round-trip on every keystroke. The server parses the same
  * query string, so the first render already matches the URL.
  */
-export function ShopCatalog({ products, initialFilters }: ShopCatalogProps) {
+export function ShopCatalog({
+  products,
+  initialFilters,
+  priceBounds,
+}: ShopCatalogProps) {
   const [filters, setFilters] = useState<CatalogFilters>(initialFilters);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const update = useCallback((next: CatalogFilters) => {
     setFilters(next);
-    const search = filtersToSearchParams(next);
+    const search = filtersToSearchParams(next, priceBounds);
     // Shallow: keeps the URL shareable without re-running the server render.
     window.history.replaceState(
       null,
       "",
       search ? `/shop?${search}` : "/shop",
     );
-  }, []);
+  }, [priceBounds]);
 
   const patch = useCallback(
     (partial: Partial<CatalogFilters>) =>
@@ -78,10 +88,10 @@ export function ShopCatalog({ products, initialFilters }: ShopCatalogProps) {
     }, {});
   }, [filters, products]);
 
-  const activeCount = countActiveFilters(filters);
-  const showChips = !isDefaultFilters(filters);
+  const activeCount = countActiveFilters(filters, priceBounds);
+  const showChips = !isDefaultFilters(filters, priceBounds);
 
-  const clearAll = () => update(defaultFilters);
+  const clearAll = () => update(defaultFilters(priceBounds));
   const toggleTag = (tag: ProductTag) =>
     patch({
       tags: filters.tags.includes(tag)
@@ -92,6 +102,7 @@ export function ShopCatalog({ products, initialFilters }: ShopCatalogProps) {
   const filterPanel = (
     <FilterPanel
       filters={filters}
+      priceBounds={priceBounds}
       categoryCounts={categoryCounts}
       onCategoryChange={(category: ProductCategory | "all") =>
         patch({ category })
@@ -156,6 +167,7 @@ export function ShopCatalog({ products, initialFilters }: ShopCatalogProps) {
             {showChips ? (
               <ActiveFilters
                 filters={filters}
+                priceBounds={priceBounds}
                 onClearQuery={() => patch({ query: "" })}
                 onClearCategory={() => patch({ category: "all" })}
                 onClearTag={toggleTag}

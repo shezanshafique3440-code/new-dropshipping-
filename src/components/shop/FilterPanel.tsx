@@ -2,6 +2,7 @@
 
 import { PriceFilter } from "@/components/shop/PriceFilter";
 import { Icon } from "@/components/ui/Icon";
+import type { PriceBounds } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
 import {
   PRODUCT_CATEGORIES,
@@ -19,6 +20,8 @@ const tagOptions: ReadonlyArray<{ value: ProductTag; label: string }> = [
 
 export interface FilterPanelProps {
   filters: CatalogFilters;
+  /** The published catalogue's price range, read on the server. */
+  priceBounds: PriceBounds;
   onCategoryChange: (category: ProductCategory | "all") => void;
   onTagToggle: (tag: ProductTag) => void;
   onPriceChange: (range: { min: number; max: number }) => void;
@@ -45,6 +48,7 @@ function Group({
 /** Filter controls, shared by the desktop sidebar and the mobile drawer. */
 export function FilterPanel({
   filters,
+  priceBounds,
   onCategoryChange,
   onTagToggle,
   onPriceChange,
@@ -100,6 +104,7 @@ export function FilterPanel({
         <PriceFilter
           min={filters.minPrice}
           max={filters.maxPrice}
+          bounds={priceBounds}
           onChange={onPriceChange}
         />
       </Group>

@@ -2,12 +2,14 @@
 
 import { useId } from "react";
 
-import { priceBounds } from "@/data/mock-storefront";
 import { formatPrice } from "@/lib/format";
+import type { PriceBounds } from "@/lib/catalog";
 
 export interface PriceFilterProps {
   min: number;
   max: number;
+  /** The published catalogue's real range, read from the database. */
+  bounds: PriceBounds;
   onChange: (range: { min: number; max: number }) => void;
 }
 
@@ -21,16 +23,19 @@ const STEP = 1;
  * quick dragging. Each handle clamps against the other, so the range can never
  * invert.
  */
-export function PriceFilter({ min, max, onChange }: PriceFilterProps) {
+export function PriceFilter({ min, max, bounds, onChange }: PriceFilterProps) {
   const minId = useId();
   const maxId = useId();
+  const priceBounds = bounds;
 
   const clampMin = (value: number) =>
     Math.min(Math.max(priceBounds.min, value), max);
   const clampMax = (value: number) =>
     Math.max(Math.min(priceBounds.max, value), min);
 
-  const span = priceBounds.max - priceBounds.min;
+  // An empty or single-price catalogue has no span; treat it as full-width
+  // rather than dividing by zero and rendering NaN% offsets.
+  const span = Math.max(1, priceBounds.max - priceBounds.min);
   const leftPercent = ((min - priceBounds.min) / span) * 100;
   const rightPercent = ((max - priceBounds.min) / span) * 100;
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { MAX_REQUEST_BYTES, isPaymentConfigured } from "@/server/payments/config";
 import { createCheckoutSession } from "@/server/payments/checkout-session";
+import { findSellableProducts } from "@/server/catalog/service";
 import {
   parseCheckoutRequest,
   type RequestRejection,
@@ -72,7 +73,12 @@ export async function POST(request: Request): Promise<Response> {
     return safeError(400, REJECTION_MESSAGES.invalid_body);
   }
 
-  const parsed = parseCheckoutRequest(body);
+  // Prices come from the published catalogue in PostgreSQL, never from the
+  // request. An unpublished product is not in the lookup, so it cannot be
+  // bought.
+  const parsed = await parseCheckoutRequest(body, (ids) =>
+    findSellableProducts(ids),
+  );
   if (!parsed.ok) {
     // The detail is deliberately kept server-side; it names no customer data.
     console.warn(

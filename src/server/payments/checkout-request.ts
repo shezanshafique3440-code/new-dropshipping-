@@ -1,8 +1,7 @@
 import { findCountry } from "@/data/countries";
 import { findDeliveryOption } from "@/data/checkout-options";
-import { findProductById } from "@/lib/catalog";
 import { validateAddress, validateInformation } from "@/lib/checkout";
-import { lineAmount, sumMinorUnits, toMinorUnits } from "@/lib/money";
+import { lineAmount, sumMinorUnits } from "@/lib/money";
 import { MAX_LINE_QUANTITY } from "@/lib/cart";
 import type {
   CustomerInformation,
@@ -17,8 +16,14 @@ import { MAX_CHECKOUT_LINES } from "./config";
  *
  * The browser is treated as an untrusted party throughout: it says which
  * products and how many, and nothing else. Names, prices and totals are
- * looked up from the catalogue here, so a request claiming a $1 pair of
- * headphones buys the same $79.99 headphones as everyone else.
+ * looked up here, so a request claiming a $1 pair of headphones buys the same
+ * $79.99 headphones as everyone else.
+ *
+ * The lookup is now a database read, and it is scoped to *published*
+ * products: a draft or an archived product is simply not found, so it cannot
+ * be bought at any price. The resolver is injected rather than imported so
+ * this module stays pure and testable, and so the whole basket is one query
+ * instead of one per line.
  */
 
 export interface TrustedLine {
@@ -88,7 +93,15 @@ function readQuantity(value: unknown): number | null {
   return value;
 }
 
-export function parseCheckoutRequest(body: unknown): ParseResult {
+/** Resolves ids to the products that may actually be sold, in one query. */
+export type SellableProductLookup = (
+  ids: readonly string[],
+) => Promise<ReadonlyMap<string, Product>>;
+
+export async function parseCheckoutRequest(
+  body: unknown,
+  findSellable: SellableProductLookup,
+): Promise<ParseResult> {
   if (!isRecord(body)) {
     return reject("invalid_body", "Body is not a JSON object.");
   }
@@ -101,7 +114,9 @@ export function parseCheckoutRequest(body: unknown): ParseResult {
     return reject("too_many_lines", `More than ${MAX_CHECKOUT_LINES} lines.`);
   }
 
-  const lines: TrustedLine[] = [];
+  // Two passes: read and validate the shape of every line first, then resolve
+  // all the products at once. A basket of ten lines is one query, not ten.
+  const requested: { productId: string; quantity: number }[] = [];
   const seen = new Set<string>();
 
   for (const raw of rawItems) {
@@ -126,19 +141,27 @@ export function parseCheckoutRequest(body: unknown): ParseResult {
       );
     }
 
-    // The one source of price truth. Anything the client sent is discarded.
-    const product = findProductById(productId);
+    requested.push({ productId, quantity });
+  }
+
+  // The one source of price truth. Anything the client sent about price,
+  // name or total is discarded; only published products are in this map.
+  const catalogue = await findSellable(requested.map((line) => line.productId));
+
+  const lines: TrustedLine[] = [];
+  for (const { productId, quantity } of requested) {
+    const product = catalogue.get(productId);
     if (!product) {
-      return reject("unknown_product", `No catalogue product ${productId}.`);
+      // Covers "no such product" and "not on sale" with one answer: the
+      // shopper does not need to learn which, and a draft should not be
+      // discoverable by trying to buy it.
+      return reject("unknown_product", `No published product ${productId}.`);
     }
 
-    let unitAmount: number;
-    try {
-      unitAmount = toMinorUnits(product.price);
-    } catch {
-      return reject("unsellable_product", `Product ${productId} has no usable price.`);
-    }
-    if (unitAmount <= 0) {
+    // Already an integer number of minor units, straight from the column.
+    // Nothing here multiplies a float.
+    const unitAmount = product.priceAmount;
+    if (!Number.isSafeInteger(unitAmount) || unitAmount <= 0) {
       return reject("unsellable_product", `Product ${productId} is not sellable.`);
     }
 

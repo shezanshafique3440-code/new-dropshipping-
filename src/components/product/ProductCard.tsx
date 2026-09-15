@@ -68,9 +68,17 @@ export function ProductCard({
         <ProductArtwork art={art} tone={tone} />
 
         <div className="pointer-events-none absolute inset-x-3 top-3 flex items-start justify-between gap-2">
-          <span className="flex flex-wrap gap-1.5">
+          {/* `min-w-0` and the truncation matter now that badge labels are
+              typed by an operator rather than fixed in the data file: a long
+              one has to end in an ellipsis rather than push the favourite
+              button off the card. */}
+          <span className="flex min-w-0 flex-wrap gap-1.5">
             {badge ? (
-              <Badge variant={badgeVariants[badge.tone]} size="sm">
+              <Badge
+                variant={badgeVariants[badge.tone]}
+                size="sm"
+                className="max-w-full overflow-hidden text-ellipsis"
+              >
                 {badge.label}
               </Badge>
             ) : null}
@@ -104,7 +112,9 @@ export function ProductCard({
         ) : null}
 
         <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-2">
-          <p className="flex items-baseline gap-2">
+          {/* Wraps rather than overflowing: a four-figure price beside a
+              struck-through one does not fit a 320px card on one line. */}
+          <p className="flex min-w-0 flex-wrap items-baseline gap-x-2">
             <span className="text-base font-bold sm:text-lg">
               {formatPrice(price)}
             </span>

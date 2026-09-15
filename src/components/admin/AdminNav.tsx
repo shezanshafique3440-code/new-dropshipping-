@@ -5,7 +5,12 @@ import { usePathname } from "next/navigation";
 
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { cn } from "@/lib/utils";
-import { adminHref, adminAccountHref, adminOrdersHref } from "@/lib/routes";
+import {
+  adminHref,
+  adminAccountHref,
+  adminOrdersHref,
+  adminProductsHref,
+} from "@/lib/routes";
 
 /**
  * The panel's navigation.
@@ -27,6 +32,7 @@ interface AdminNavItem {
 const ITEMS: readonly AdminNavItem[] = [
   { href: adminHref(), label: "Dashboard", icon: "layers", exact: true },
   { href: adminOrdersHref(), label: "Orders", icon: "bag" },
+  { href: adminProductsHref(), label: "Products", icon: "sparkle" },
   { href: adminAccountHref(), label: "Your profile", icon: "user" },
 ];
 

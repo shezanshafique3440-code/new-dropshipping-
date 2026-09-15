@@ -5,18 +5,20 @@
 A premium international storefront built with Next.js (App Router), TypeScript
 and Tailwind CSS.
 
-> **Status: Step 11 — admin operations.**
+> **Status: Step 12 — database-backed product catalogue.**
 > Foundation, design system, homepage, catalogue, cart, checkout, Stripe
-> payments, durable order storage, customer sign-in, order history and an
-> internal operations panel are in place. Payment runs through Stripe Checkout
+> payments, durable order storage, customer sign-in, order history, an
+> internal operations panel and product management are in place. **The
+> catalogue is a PostgreSQL table**: the storefront reads published products
+> from it, and operators create, edit, publish and archive them in the panel. Payment runs through Stripe Checkout
 > and is expected to be in **test mode**: a live key is refused unless the
 > deployment explicitly opts in (see [Payments](#payments-stripe)). **Guest
 > checkout remains fully supported** — an account is never required to buy,
 > and guest orders never appear in anybody's history, though an operator can
 > see them. Password reset, email verification, two-factor authentication,
 > product and catalogue management, refunds, fulfilment and tracking, tax,
-> transactional email and supplier integrations are deliberately **not**
-> implemented yet.
+> transactional email, supplier integrations, product imports, inventory and
+> product photography are deliberately **not** implemented yet.
 
 ## Getting started
 
@@ -45,6 +47,7 @@ A PostgreSQL database is required from Step 8 onwards — see
 | `npm run db:migrate`  | Create and apply a migration (development) |
 | `npm run db:deploy`   | Apply existing migrations (deployment)   |
 | `npm run db:status`   | Show which migrations have been applied  |
+| `npm run db:seed`     | Load the starter catalogue (idempotent; `-- --force` rewrites) |
 | `npm run admin:bootstrap` | Create the first administrator (see [Operations panel](#operations-panel-admin)) |
 
 ## Project structure
@@ -68,6 +71,7 @@ src/
 │   │       ├── page.tsx        # Dashboard
 │   │       ├── orders/         # List, filters, search, pagination
 │   │       ├── orders/[reference]/  # One order, with status control
+│   │       ├── products/       # Catalogue list, create, edit, publish
 │   │       └── account/page.tsx     # The operator's own profile
 │   ├── checkout/page.tsx       # Checkout flow
 │   ├── checkout/success/       # Stripe return: verifies before confirming
@@ -75,6 +79,9 @@ src/
 │       ├── auth/register|login|logout/route.ts
 │       ├── admin/login|logout/route.ts
 │       ├── admin/orders/[reference]/status/route.ts
+│       ├── admin/products/route.ts               # create
+│       ├── admin/products/[slug]/route.ts        # edit
+│       ├── admin/products/[slug]/status/route.ts # publish|archive
 │       ├── account/profile/route.ts
 │       ├── checkout/create-session/route.ts
 │       ├── checkout/session-status/route.ts
@@ -91,7 +98,11 @@ src/
 │   │   ├── AdminOrderList.tsx  # table on desk, cards on a phone
 │   │   ├── AdminOrderFilters.tsx    # client — search and filters, in the URL
 │   │   ├── AdminOrderDetail.tsx     # one order, operator's view
-│   │   └── OrderStatusControl.tsx   # client — cancel, with confirmation
+│   │   ├── OrderStatusControl.tsx   # client — cancel, with confirmation
+│   │   ├── AdminProductList.tsx     # catalogue table and cards
+│   │   ├── AdminProductFilters.tsx  # client — search and filters, in the URL
+│   │   ├── AdminProductForm.tsx     # client — create and edit
+│   │   └── ProductStatusControl.tsx # client — publish, unpublish, archive
 │   ├── layout/                 # Shell composition (server-first)
 │   │   ├── Header.tsx          # Sticky glass header
 │   │   ├── AnnouncementBar.tsx
@@ -111,10 +122,11 @@ src/
 │       └── SocialIcon.tsx
 ├── config/site.ts              # Brand, currency, nav, announcement, socials
 ├── hooks/useLockBodyScroll.ts
-├── lib/                        # env, format, money, cart, checkout, catalog, routes
+├── lib/                        # env, format, money, cart, checkout, catalog, categories, routes
 ├── server/                     # server-only: never imported by a client component
 │   ├── admin/                  # administrators: sessions, authorization, bootstrap
 │   │   └── orders/             # admin order repository, DTO, query parsing, service
+│   ├── catalog/                # products: repository, services, DTOs, validation
 │   ├── auth/                   # passwords, sessions, customers, authorization
 │   ├── db/                     # Prisma client singleton + connection config
 │   ├── http/                   # same-origin (CSRF) checks
@@ -125,11 +137,12 @@ src/
 ├── proxy.ts                    # Edge gate for /account and /admin (was middleware.ts)
 └── types/index.ts
 prisma/
-├── schema.prisma               # Order, OrderItem, Customer, AdminUser, sessions, history
+├── schema.prisma               # Order, OrderItem, Product, Customer, AdminUser, sessions, history
 └── migrations/                 # Committed, applied in order
 prisma.config.ts                # Where the Prisma CLI reads DATABASE_URL
 scripts/
 ├── bootstrap-admin.mjs         # `npm run admin:bootstrap`
+├── seed-products.mjs           # `npm run db:seed`
 └── ts-resolve*.mjs             # Lets node run the app's TypeScript directly
 public/images  public/icons
 ```
@@ -236,6 +249,7 @@ the public order reference).
 | `Customer`              | A registered shopper: normalized email, name, Argon2id hash        |
 | `CustomerSession`       | A signed-in session: token digest, deadlines, revocation           |
 | `OrderItem`             | An immutable snapshot of one purchased line                       |
+| `Product`               | A catalogue product: slug, copy, category, integer price, status, merchandising flags, artwork key |
 | `AdminUser`             | A member of the operations team: normalized email, name, role, Argon2id hash, active flag |
 | `AdminSession`          | An administrator's session: token digest, deadlines, revocation    |
 | `OrderStatusHistory`    | Append-only trail of manual status changes: from, to, which administrator, when |
@@ -509,6 +523,183 @@ authentication, social sign-in, and cancelling or refunding an order from the
 account. The pages say so rather than showing empty widgets. (Administrators
 arrived in the next step and can cancel an order; a customer still cannot, and
 refunds happen in Stripe.)
+
+## Product catalogue
+
+The products the shop sells live in PostgreSQL. The storefront reads published
+rows from that table; operators create, edit, publish and archive them in the
+operations panel. `src/data/mock-storefront.ts` is no longer a live catalogue
+— it is the **seed data** a fresh database starts with.
+
+### Loading the starter catalogue
+
+```bash
+npm run db:seed            # create anything missing, touch nothing else
+npm run db:seed -- --force # also rewrite existing rows to the seed values
+```
+
+Deterministic and idempotent: every row is keyed by the product's id, so a
+second run creates nothing. The default run never overwrites an existing row —
+once the shop is live the catalogue belongs to whoever edits it in the panel,
+and a re-seed should not quietly undo their work. `--force` is the explicit way
+to say otherwise. No secrets, no customer data, nothing random.
+
+### Statuses
+
+| Status      | In the shop | Buyable | Notes                                    |
+| ----------- | ----------- | ------- | ---------------------------------------- |
+| `draft`     | no          | no      | Where a new product starts               |
+| `published` | yes         | yes     | Visible, searchable, purchasable         |
+| `archived`  | no          | no      | Withdrawn; existing orders are unaffected |
+
+Only `published` products appear anywhere public — the homepage, the shop, the
+search, related products, the product page, and the checkout's price lookup.
+The scoping lives in the repository's `where` clause, so a draft is never read
+in the first place rather than read and filtered out.
+
+A draft's product page answers with Next's not-found UI and a
+`<meta name="robots" content="noindex">`, carrying no product data. The status
+code is a soft 404 rather than a real one: the response has already begun
+streaming by the time the lookup finishes, which is the framework's documented
+behaviour and the reason it injects the `noindex` itself.
+
+**There is no delete.** Archiving is how a product leaves the shop. An order
+may name it, and the catalogue is where that name's artwork and link come
+from — so the panel offers archive, and nothing offers deletion.
+
+### Slugs are immutable
+
+A slug can be chosen when a product is created and never changed afterwards.
+It is the product's public URL *and* the id recorded against every order that
+has ever included it, so a rename would break a link and disconnect a receipt
+at the same time. The edit form shows the slug read-only, and the update
+endpoint reads the slug from the route — a slug in the request body is ignored
+rather than obeyed.
+
+The alternative, slug history with redirects, is a table and a lookup this step
+does not need. Immutability is the simpler production-safe option, and it is
+enforced rather than merely encouraged.
+
+### Money
+
+Prices are integers in minor units (cents), like every other amount in this
+project. The admin form takes "19.99" and `parsePriceInput` turns it into
+`1999` by splitting the string at the decimal point — never by multiplying a
+float, because `Number("19.99") * 100` is `1998.9999999999998`.
+
+Anything else is refused with a reason rather than rounded into something
+plausible: three decimal places, a thousands separator, a currency symbol, a
+negative, `NaN`, `Infinity`, an empty field. The database agrees separately —
+`priceAmount >= 0`, `compareAtPriceAmount >= priceAmount` when present, and a
+lowercase ISO 4217 currency — so a bad value cannot arrive by any other route.
+
+### Order snapshots are untouchable
+
+`order_items` has **no foreign key to `products`**, deliberately. An order
+records the name and the unit amount that were charged at the time, and
+nothing rewrites them afterwards. Editing a price, renaming a product,
+unpublishing it, archiving it, or deleting the row outright leaves every
+existing order saying exactly what it said before. There is a test for each of
+those, including the specific case of a $49.99 product bought twice and then
+repriced to $79.99: the old order stays at $49.99 × 2, and the next checkout
+is charged $79.99.
+
+### Stripe pricing authority
+
+Unchanged in principle from Step 7, and now sourced from the table. When a
+checkout session is created the server:
+
+1. reads the basket's product ids and quantities — and nothing else — from the
+   request;
+2. looks those ids up in one query, **scoped to published products**;
+3. takes `priceAmount` straight from the column, already an integer;
+4. computes the totals server-side and builds Stripe's line items from them.
+
+A price, a total or a discount in the request body is never read. A product
+that is not published is simply absent from the lookup, so it cannot be
+bought — the same answer as a product that never existed.
+
+### Categories
+
+One authoritative list, in `src/lib/product-categories.ts`, shared by the admin
+form, the storefront filters, the repository and — through the
+`products_category_known` CHECK constraint — the database. Adding a category is
+an edit there plus a migration that widens the constraint; it is deliberately
+not something a stray write can do. A Prisma enum would have created a second
+list to keep in step, so the column is a `VARCHAR` with a constraint instead.
+
+### Architecture
+
+```
+storefront page → catalog service → CatalogRepository → Prisma → PostgreSQL
+admin page/API  → admin catalog service → CatalogRepository → Prisma → PostgreSQL
+```
+
+Only the repository talks to Prisma. The storefront service exposes published
+reads; the admin service takes an `AdminActor` — the proof `requireAdmin()`
+produces — as a required first argument, so a page that has not resolved an
+administrator cannot read a draft, let alone write one, and the compiler says
+so. Validation lives in the service, not the route, so the same rules apply
+wherever a product comes from.
+
+### Admin product routes
+
+| Route                       | What it is                                    |
+| --------------------------- | --------------------------------------------- |
+| `/admin/products`           | Every product, with search, filters and paging |
+| `/admin/products/new`       | Create a product (saved as a draft)            |
+| `/admin/products/[slug]`    | Edit it, and publish, unpublish or archive it  |
+| `POST /api/admin/products`  | Create                                         |
+| `POST /api/admin/products/[slug]` | Edit                                     |
+| `POST /api/admin/products/[slug]/status` | Publish, unpublish, archive     |
+
+All of them are behind `requireAdmin()`, `noindex` and `no-store`, like the
+rest of the panel.
+
+Search matches a product's name or slug, filters cover status and category,
+and paging is offset-based with a total — an operator thinks in pages and
+wants to know how many products there are, and a keyset cursor gives neither.
+All four happen in PostgreSQL; the browser never receives more products than
+it displays.
+
+### Concurrent edits
+
+Saves are optimistic. The form carries the `updatedAt` it loaded, and the
+update matches on it, so a save against a stale copy writes nothing and is
+reported as a conflict rather than overwriting a colleague's work. Two
+administrators saving at the same moment produce one write and one conflict.
+
+### Artwork
+
+Products are drawn with the built-in illustration set. The database stores a
+key (`artKey`) and a tone, not an image — the visual identity is referenced,
+never embedded — so nothing here depends on an image pipeline that does not
+exist yet. Real photography arrives with the supplier integration.
+
+### Tests
+
+```bash
+# prices, validation and query parsing, with no database
+node --import ./register.mjs --test catalog-unit.test.mjs
+
+# the repository, the services, and order snapshots after a price change
+DATABASE_URL=... node --import ./register.mjs --test catalog-db.test.mjs
+
+# the endpoints and the storefront over HTTP, against a production build
+node --test catalog-http.test.mjs
+
+# the whole admin journey in a browser
+node catalog-browser.mjs
+
+# accessibility, and 320-1920px in both themes
+node catalog-a11y.mjs
+```
+
+### Not implemented in this step
+
+Product variants, inventory, supplier feeds, CSV or automated imports, image
+upload, product reviews, wishlists, coupons, bulk editing, and a delete
+control. The panel says so where an operator might look for one.
 
 ## Operations panel (admin)
 

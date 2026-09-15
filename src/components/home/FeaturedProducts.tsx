@@ -2,10 +2,24 @@ import { SectionHeading } from "@/components/home/SectionHeading";
 import { ProductCard } from "@/components/product/ProductCard";
 import { ButtonLink } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
-import { featuredProducts } from "@/data/mock-storefront";
+import type { Product } from "@/types";
 
-/** First product grid: four hand-picked demo products. */
-export function FeaturedProducts() {
+export interface FeaturedProductsProps {
+  /** Published products flagged `featured`, read from the database. */
+  products: readonly Product[];
+}
+
+/**
+ * First product grid: the products an operator marked as featured.
+ *
+ * Nothing is rendered when none are — an empty grid under a heading reads as
+ * a broken page, and inventing filler would be worse.
+ */
+export function FeaturedProducts({ products }: FeaturedProductsProps) {
+  if (products.length === 0) {
+    return null;
+  }
+
   return (
     <section aria-labelledby="featured-heading" className="section-y">
       <Container className="flex flex-col gap-10">
@@ -23,7 +37,7 @@ export function FeaturedProducts() {
         />
 
         <ul className="reveal-stagger grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4">
-          {featuredProducts.map((product) => (
+          {products.map((product) => (
             <li key={product.id} className="flex">
               <ProductCard product={product} className="w-full" />
             </li>

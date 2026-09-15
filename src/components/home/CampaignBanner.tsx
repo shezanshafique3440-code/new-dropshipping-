@@ -4,13 +4,9 @@ import { ButtonLink } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Container } from "@/components/ui/Container";
 import { Icon } from "@/components/ui/Icon";
-import { featuredProducts } from "@/data/mock-storefront";
+import type { Product } from "@/types";
 
-const stats = [
-  { label: "Pieces in the edit", value: "24" },
-  { label: "Categories", value: "6" },
-  { label: "Restocked", value: "Weekly" },
-] as const;
+
 
 /**
  * Editorial campaign break between the two halves of the page.
@@ -20,8 +16,29 @@ const stats = [
  * dark value even while the rest of the page is light. That keeps the section
  * consistent without hard-coding a second palette.
  */
-export function CampaignBanner() {
-  const [, lamp, backpack, speaker] = featuredProducts;
+export interface CampaignBannerProps {
+  /** Published products for the collage; missing tiles simply do not render. */
+  products: readonly Product[];
+  /** Everything published, counted by the database. */
+  productCount: number;
+  /** Categories that actually hold a published product. */
+  categoryCount: number;
+}
+
+export function CampaignBanner({
+  products,
+  productCount,
+  categoryCount,
+}: CampaignBannerProps) {
+  const [, lamp, backpack, speaker] = products;
+
+  // Counted, not claimed: the figures under the campaign copy are the real
+  // size of the published catalogue.
+  const stats = [
+    { label: "Pieces in the edit", value: String(productCount) },
+    { label: "Categories", value: String(categoryCount) },
+    { label: "Restocked", value: "Weekly" },
+  ] as const;
 
   return (
     <section aria-labelledby="campaign-heading" className="section-y-sm">

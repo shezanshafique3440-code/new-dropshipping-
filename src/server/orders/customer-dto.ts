@@ -1,6 +1,5 @@
 import { findDeliveryOption } from "@/data/checkout-options";
-import { findProductById } from "@/lib/catalog";
-import type { ArtTone, Order, ProductArtKey } from "@/types";
+import type { ArtTone, Order, Product, ProductArtKey } from "@/types";
 
 /**
  * What a signed-in customer is allowed to see of their own order.
@@ -13,7 +12,12 @@ import type { ArtTone, Order, ProductArtKey } from "@/types";
  *
  * Amounts are the persisted integers, in minor units. Nothing here recomputes
  * a total from the catalogue: an order is a record of what was charged, not a
- * live quote.
+ * live quote. The same goes for the item names — they are the snapshot taken
+ * when the order was paid for.
+ *
+ * The catalogue is consulted for exactly two things: the artwork to draw, and
+ * whether a product page still exists to link to. Both are absent when the
+ * product has gone, and neither can change what the order says.
  */
 
 export interface CustomerOrderItemView {
@@ -58,7 +62,13 @@ export interface CustomerOrderDetailView extends CustomerOrderSummaryView {
 /** How many product thumbnails a list row shows. */
 const PREVIEW_LIMIT = 3;
 
-export function toCustomerOrderSummary(order: Order): CustomerOrderSummaryView {
+/** Artwork and links for the products an order mentions, if they still exist. */
+export type OrderArtworkLookup = ReadonlyMap<string, Product>;
+
+export function toCustomerOrderSummary(
+  order: Order,
+  catalogue: OrderArtworkLookup = new Map(),
+): CustomerOrderSummaryView {
   return {
     reference: order.reference,
     placedAt: order.createdAt,
@@ -68,7 +78,7 @@ export function toCustomerOrderSummary(order: Order): CustomerOrderSummaryView {
     totalAmount: order.totalAmount,
     itemCount: order.items.reduce((total, item) => total + item.quantity, 0),
     preview: order.items.slice(0, PREVIEW_LIMIT).map((item) => {
-      const product = findProductById(item.productId);
+      const product = catalogue.get(item.productId);
       return {
         name: item.name,
         art: product?.art ?? null,
@@ -78,11 +88,14 @@ export function toCustomerOrderSummary(order: Order): CustomerOrderSummaryView {
   };
 }
 
-export function toCustomerOrderDetail(order: Order): CustomerOrderDetailView {
+export function toCustomerOrderDetail(
+  order: Order,
+  catalogue: OrderArtworkLookup = new Map(),
+): CustomerOrderDetailView {
   const delivery = findDeliveryOption(order.deliveryOptionId);
 
   return {
-    ...toCustomerOrderSummary(order),
+    ...toCustomerOrderSummary(order, catalogue),
     updatedAt: order.updatedAt,
     subtotalAmount: order.subtotalAmount,
     shippingAmount: order.shippingAmount,
@@ -96,7 +109,7 @@ export function toCustomerOrderDetail(order: Order): CustomerOrderDetailView {
       // The catalogue is consulted for artwork and for whether a product page
       // still exists — never for the name or the price, which are the
       // historical record and must not drift.
-      const product = findProductById(item.productId);
+      const product = catalogue.get(item.productId);
       return {
         name: item.name,
         quantity: item.quantity,
